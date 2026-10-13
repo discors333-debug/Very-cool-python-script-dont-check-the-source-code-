@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: full-bleed universe canvas; thin command bar on top, object dossier docked left, nav + clock along the bottom */
+/* Layout: full-bleed universe canvas; command bar on top, object dossier docked left (bottom sheet on phones), nav + clock along the bottom, thumb controls on touch */
 :root {
   --void: #000003;
   --ink: #dfe7f3;
@@ -17,38 +17,48 @@
   --sel: #6fd0ff;
   --warm: #ffb860;
   --ok: #8fe0a8;
-  --ui: "Exo 2", "Segoe UI", system-ui, sans-serif;
+  --ui: "Exo 2", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --sheet-h: 0px;
+  --sl: env(safe-area-inset-left, 0px);
+  --sr: env(safe-area-inset-right, 0px);
+  --st: env(safe-area-inset-top, 0px);
+  --sb: env(safe-area-inset-bottom, 0px);
   color-scheme: dark;
 }
 [hidden] { display: none !important; }
-html, body { height: 100%; margin: 0; overflow: hidden; background: var(--void); color: var(--ink); }
-body { font: 13px/1.4 var(--ui); -webkit-user-select: none; user-select: none; }
+html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; background: var(--void); color: var(--ink); }
+body { font: 13px/1.4 var(--ui); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-text-size-adjust: 100%; }
 canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 #gl { touch-action: none; }
 #ov { pointer-events: none; z-index: 1; }
+button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
 .panel { position: fixed; z-index: 3; background: var(--panel); border: 1px solid var(--edge); border-radius: 4px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 
-#bar { top: calc(8px + env(safe-area-inset-top, 0px)); left: 8px; right: 8px; display: flex; align-items: center; gap: 8px; padding: 6px 8px; flex-wrap: wrap; }
+#bar { top: calc(8px + var(--st)); left: calc(8px + var(--sl)); right: calc(8px + var(--sr)); display: flex; align-items: center; gap: 8px; padding: 6px 8px; flex-wrap: wrap; z-index: 4; }
 #bar .brand { font: 700 13px/1 var(--ui); letter-spacing: 0.22em; text-transform: uppercase; padding: 0 6px; white-space: nowrap; }
 #bar .brand i { color: var(--sel); font-style: normal; }
 .search { position: relative; flex: 1 1 200px; min-width: 0; max-width: 420px; }
-.search input { width: 100%; box-sizing: border-box; font: 500 13px var(--ui); color: var(--ink); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--edge); border-radius: 3px; padding: 6px 10px; outline: none; }
+.search input { width: 100%; box-sizing: border-box; font: 500 13px var(--ui); color: var(--ink); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--edge); border-radius: 3px; padding: 6px 10px; outline: none; -webkit-appearance: none; appearance: none; }
 .search input:focus { border-color: var(--sel); }
-#results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); list-style: none; margin: 0; padding: 4px; background: var(--panel); border: 1px solid var(--edge); border-radius: 3px; max-height: 260px; overflow-y: auto; }
-#results li { padding: 6px 8px; border-radius: 2px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; }
-#results li span { color: var(--dim); font-size: 11px; white-space: nowrap; }
+#results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); list-style: none; margin: 0; padding: 4px; background: rgba(8, 12, 22, 0.96); border: 1px solid var(--edge); border-radius: 3px; max-height: 260px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#results li { padding: 8px; border-radius: 2px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; }
+#results li span { color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #results li:hover, #results li.hi { background: rgba(111, 208, 255, 0.14); }
 .tools { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+.menu-btn { display: none !important; }
 button.t { font: 600 11px/1 var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); background: rgba(255, 255, 255, 0.04); border: 1px solid var(--edge); border-radius: 3px; padding: 7px 9px; cursor: pointer; white-space: nowrap; }
 button.t:hover { border-color: var(--sel); }
+button.t:disabled { opacity: 0.35; cursor: default; }
 button.t.on { background: rgba(111, 208, 255, 0.18); border-color: var(--sel); color: #fff; }
 button.t.go { border-color: var(--warm); color: var(--warm); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--sel); outline-offset: 1px; }
 
-#info { top: calc(62px + env(safe-area-inset-top, 0px)); left: 8px; width: 290px; max-height: calc(100% - 170px); overflow-y: auto; padding: 14px 16px; }
+#info { top: calc(62px + var(--st)); left: calc(8px + var(--sl)); width: 290px; max-height: calc(100% - 170px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px; }
+#info .head { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
 #info h2 { margin: 0; font: 700 20px/1.15 var(--ui); letter-spacing: 0.02em; text-wrap: balance; word-break: break-word; }
+#info .more { display: none; flex: none; }
 #info .cls { margin-top: 4px; color: var(--sel); font: 600 12px var(--ui); letter-spacing: 0.06em; text-transform: uppercase; }
 #info .where { margin-top: 2px; color: var(--dim); font-size: 12px; }
 #info dl { margin: 12px 0 0; display: grid; gap: 4px; }
@@ -57,38 +67,55 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--sel); outli
 #info dd { margin: 0; font: 12px/1.35 var(--mono); font-variant-numeric: tabular-nums; word-break: break-word; }
 #info .life { color: var(--ok); }
 #info .actions { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
-#info .empty { color: var(--dim); font-size: 12px; margin-top: 8px; }
+#info .empty { color: var(--dim); font-size: 12px; margin: 8px 0 0; }
 
-#nav { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); left: 8px; padding: 8px 12px; display: grid; gap: 2px; font: 12px var(--mono); font-variant-numeric: tabular-nums; max-width: calc(100% - 290px); }
+#nav { bottom: calc(8px + var(--sb)); left: calc(8px + var(--sl)); padding: 8px 12px; display: grid; gap: 2px; font: 12px var(--mono); font-variant-numeric: tabular-nums; max-width: calc(100% - 300px); }
 #nav b { font: 600 10px var(--ui); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin-right: 6px; }
-#clock { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); right: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+#clock { bottom: calc(8px + var(--sb)); right: calc(8px + var(--sr)); padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
 #clock .date { font: 12px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
 #clock .date small { display: block; color: var(--dim); font-size: 11px; }
 
-#help { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100% - 32px)); padding: 18px 20px; z-index: 5; }
+#help { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(580px, calc(100% - 32px)); max-height: calc(100% - 48px); overflow-y: auto; padding: 18px 20px; z-index: 6; }
 #help h3 { margin: 0 0 10px; font: 700 15px var(--ui); letter-spacing: 0.14em; text-transform: uppercase; }
+#help h4 { margin: 14px 0 8px; font: 600 11px var(--ui); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
 #help dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
 #help dt { font: 500 12px var(--mono); color: var(--sel); }
-#help dd { margin: 0; color: var(--ink); }
+#help dd { margin: 0; }
 #help p { color: var(--dim); margin: 12px 0 0; }
 
-#toast { position: fixed; z-index: 4; left: 50%; top: 22%; transform: translateX(-50%); font: 600 14px var(--ui); letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 16px; border-radius: 3px; background: var(--panel); border: 1px solid var(--edge); opacity: 0; transition: opacity 0.4s; pointer-events: none; text-align: center; max-width: calc(100% - 32px); }
+#toast { position: fixed; z-index: 5; left: 50%; top: 24%; transform: translateX(-50%); font: 600 14px var(--ui); letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 16px; border-radius: 3px; background: var(--panel); border: 1px solid var(--edge); opacity: 0; transition: opacity 0.4s; pointer-events: none; text-align: center; max-width: calc(100% - 32px); }
 #toast.show { opacity: 1; }
 #fail { position: fixed; inset: 0; display: grid; place-items: center; z-index: 9; padding: 16px; text-align: center; color: var(--dim); }
 
-.touch { position: fixed; z-index: 3; left: 50%; transform: translateX(-50%); bottom: calc(64px + env(safe-area-inset-bottom, 0px)); display: none; gap: 6px; }
-.touch button { font: 600 12px var(--ui); color: var(--ink); background: var(--panel); border: 1px solid var(--edge); border-radius: 4px; min-width: 50px; height: 46px; touch-action: none; -webkit-tap-highlight-color: transparent; }
-.touch button.active { background: rgba(111, 208, 255, 0.25); border-color: var(--sel); }
-@media (pointer: coarse) { .touch { display: flex; } }
-@media (max-width: 720px) {
+.joy { display: none; position: fixed; z-index: 3; left: calc(18px + var(--sl)); bottom: calc(var(--sheet-h) + 26px + var(--sb)); width: 124px; height: 124px; border-radius: 50%; border: 1px solid var(--edge); background: rgba(8, 12, 22, 0.45); touch-action: none; }
+.joy .knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: rgba(111, 208, 255, 0.22); border: 1px solid var(--sel); pointer-events: none; }
+.joy small { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font: 600 9px var(--ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); pointer-events: none; }
+.pad { display: none; position: fixed; z-index: 3; right: calc(18px + var(--sr)); bottom: calc(var(--sheet-h) + 26px + var(--sb)); grid-template-columns: repeat(2, 56px); gap: 8px; }
+.pad button { font: 600 11px var(--ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); background: rgba(8, 12, 22, 0.6); border: 1px solid var(--edge); border-radius: 6px; height: 52px; touch-action: none; }
+.pad button.active { background: rgba(111, 208, 255, 0.3); border-color: var(--sel); }
+
+@media (pointer: coarse), (max-width: 720px) {
+  .joy { display: block; }
+  .pad { display: grid; }
+  #bar { padding: 5px 6px; gap: 6px; }
   #bar .brand { display: none; }
-  #info { width: calc(100% - 16px); max-height: 34%; top: auto; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); padding: 10px 12px; }
-  #info h2 { font-size: 16px; }
-  #info dl div { grid-template-columns: 100px 1fr; }
-  #nav { max-width: calc(100% - 16px); right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); font-size: 11px; }
-  #clock { bottom: auto; top: calc(96px + env(safe-area-inset-top, 0px)); }
-  .touch { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
-  #info.has-touch { bottom: calc(170px + env(safe-area-inset-bottom, 0px)); }
+  .menu-btn { display: inline-block !important; padding: 9px 10px !important; }
+  .search { max-width: none; }
+  .search input { font-size: 16px; padding: 7px 10px; }
+  #bar .tools { display: none; width: 100%; margin-left: 0; }
+  #bar.open .tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  #bar.open .tools button { padding: 12px 4px; }
+  #nav { top: calc(58px + var(--st)); bottom: auto; background: transparent; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; padding: 0 6px; font-size: 11px; max-width: calc(100% - 24px); text-shadow: 0 1px 3px #000; z-index: 2; }
+  #nav .loc { display: none; }
+  #clock { display: none; }
+  body.menu-open #clock { display: flex; bottom: auto; }
+  #info { top: auto; left: calc(8px + var(--sl)); right: calc(8px + var(--sr)); width: auto; bottom: calc(8px + var(--sb)); max-height: 52%; padding: 10px 12px; box-sizing: border-box; }
+  #info h2 { font-size: 17px; }
+  #info .more { display: inline-block; }
+  #info:not(.expanded) dl { display: none; }
+  #info dl div { grid-template-columns: 108px 1fr; }
+  #info .actions { margin-top: 10px; }
+  #info .actions button.t { padding: 11px 12px; }
 }
 @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
 </style>
@@ -100,17 +127,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--sel); outli
   <div class="brand">Deep <i>Field</i></div>
   <div class="search">
     <label for="q" hidden>Find object</label>
-    <input id="q" type="search" placeholder="Find star, planet or galaxy  (Ctrl+F)" autocomplete="off" spellcheck="false">
+    <input id="q" type="search" placeholder="Find star, planet, nebula, galaxy" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="go">
     <ul id="results" hidden></ul>
   </div>
-  <div class="tools">
+  <button class="t menu-btn" id="t-menu" type="button" aria-expanded="false" aria-controls="tools">Menu</button>
+  <div class="tools" id="tools">
     <button class="t go" id="t-goto" type="button" title="Go to selected (G)">Go to</button>
+    <button class="t go" id="t-land" type="button" title="Land on selected (Shift+G)">Land</button>
     <button class="t" id="t-center" type="button" title="Look at selected (C)">Center</button>
+    <button class="t" id="t-home" type="button" title="Return home (H)">Home</button>
     <button class="t on" id="t-orbits" type="button" title="Orbits (O)">Orbits</button>
     <button class="t on" id="t-labels" type="button" title="Labels (L)">Labels</button>
     <button class="t on" id="t-info" type="button" title="Info panel (I)">Info</button>
-    <button class="t" id="t-home" type="button" title="Return home (H)">Home</button>
-    <button class="t" id="t-help" type="button" title="Controls (F1)">?</button>
+    <button class="t" id="t-help" type="button" title="Controls (F1)">Help</button>
   </div>
 </header>
 
@@ -119,7 +148,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--sel); outli
 <section id="nav" class="panel" aria-label="Navigation">
   <div><b>Speed</b><span id="n-speed">–</span></div>
   <div><b>Nearest</b><span id="n-near">–</span></div>
-  <div><b>Location</b><span id="n-loc">–</span></div>
+  <div class="loc"><b>Location</b><span id="n-loc">–</span></div>
 </section>
 
 <section id="clock" class="panel" aria-label="Time">
@@ -131,31 +160,40 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--sel); outli
 
 <div id="help" class="panel" hidden role="dialog" aria-label="Controls">
   <h3>Flight controls</h3>
+  <h4>Keyboard and mouse</h4>
   <dl>
     <dt>Left drag</dt><dd>Look around</dd>
     <dt>Right drag / Shift+drag</dt><dd>Orbit the selected object</dd>
     <dt>W A S D · R F</dt><dd>Fly forward, left, back, right · up, down</dd>
     <dt>Q E</dt><dd>Roll</dd>
-    <dt>Mouse wheel · + −</dt><dd>Change speed (scales with distance to the nearest object)</dd>
-    <dt>Click</dt><dd>Select a star, planet, moon or galaxy</dd>
-    <dt>G</dt><dd>Go to the selected object</dd>
-    <dt>C</dt><dd>Turn to face the selected object</dd>
+    <dt>Wheel · + −</dt><dd>Change speed. Speed always scales with your distance to the nearest surface.</dd>
+    <dt>Shift</dt><dd>Hold for 5× speed</dd>
+    <dt>Click</dt><dd>Select a star, planet, moon, nebula or galaxy</dd>
+    <dt>G · Shift+G</dt><dd>Go to the selection · land on it</dd>
+    <dt>C</dt><dd>Turn to face the selection</dd>
     <dt>Ctrl+F</dt><dd>Find an object by name</dd>
     <dt>, . /  P</dt><dd>Slow time, speed time, real time, pause</dd>
-    <dt>O L I</dt><dd>Toggle orbits, labels, info panel</dd>
-    <dt>H</dt><dd>Return to the home world</dd>
+    <dt>O L I · H</dt><dd>Orbits, labels, info panel · return home</dd>
   </dl>
-  <p>Everything is at true scale. Planets are dots from a few AU away; select them in the labels and press G. Zoom out far enough and the whole galaxy, then its neighbours, come into view.</p>
-  <div class="actions" style="margin-top:14px"><button class="t" id="help-close" type="button">Close</button></div>
+  <h4>Touch</h4>
+  <dl>
+    <dt>Drag</dt><dd>Look around</dd>
+    <dt>Joystick</dt><dd>Fly forward, back and sideways</dd>
+    <dt>Pinch</dt><dd>Change speed</dd>
+    <dt>Tap</dt><dd>Select, then Go to or Land in the info sheet</dd>
+  </dl>
+  <p>Everything is at true scale. Planets are dots from a few AU away, so pick them from the labels or search. Land on any rocky world: terrain streams in more detail the lower you fly, and the camera turns with the ground.</p>
+  <div style="margin-top:14px"><button class="t" id="help-close" type="button">Close</button></div>
 </div>
 
 <div id="toast" role="status"></div>
 
-<div class="touch" aria-label="Touch flight controls">
-  <button type="button" data-hold="back">Back</button>
-  <button type="button" data-hold="fwd">Fwd</button>
-  <button type="button" id="tc-slow">Spd−</button>
+<div class="joy" id="joy" aria-label="Movement joystick"><small>Move</small><div class="knob"></div></div>
+<div class="pad" aria-label="Touch flight controls">
+  <button type="button" data-hold="KeyR">Up</button>
   <button type="button" id="tc-fast">Spd+</button>
+  <button type="button" data-hold="KeyF">Down</button>
+  <button type="button" id="tc-slow">Spd−</button>
 </div>
 
 <div id="fail" hidden>The 3D engine could not load. Check your connection and reload the page.</div>
@@ -172,6 +210,7 @@ const AU = 1.495978707e5;     // megametres per AU
 const C_LYS = 3.1688e-8;      // speed of light in ly/s
 const EPOCH = Date.UTC(2026, 9, 13, 12, 0, 0);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const MOBILE = matchMedia("(pointer: coarse)").matches || Math.min(screen.width, screen.height) < 600;
 
 // ================= utilities =================
 function mulberry32(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -188,6 +227,7 @@ const fmtN = (v, d = 0) => v.toLocaleString("en-US", { maximumFractionDigits: d,
 function fmtSig(v) { if (v === 0) return "0"; const a = Math.abs(v); if (a >= 1e6 || a < 1e-3) return v.toExponential(2).replace("e+", "e"); return fmtN(v, a >= 100 ? 0 : a >= 10 ? 1 : 2); }
 function fmtDist(ly) {
   const km = ly * LY * 1000;
+  if (km < 1) return fmtN(km * 1000, km < 0.01 ? 1 : 0) + " m";
   if (km < 1e6) return fmtN(km, km < 10 ? 2 : 0) + " km";
   const au = km / (AU * 1000);
   if (au < 20000) return fmtSig(au) + " AU";
@@ -196,6 +236,7 @@ function fmtDist(ly) {
 }
 function fmtSpeed(lys) {
   const kms = lys * LY * 1000;
+  if (kms < 1) return fmtSig(kms * 1000) + " m/s";
   if (kms < 1e4) return fmtSig(kms) + " km/s";
   const c = lys / C_LYS;
   if (c < 1e5) return fmtSig(c) + " c";
@@ -257,7 +298,7 @@ const CLASS_W = CLASS_KEYS.reduce((s, k) => s + CLASSES[k].w, 0);
 function pickClass(r) { let u = r() * CLASS_W; for (const k of CLASS_KEYS) { u -= CLASSES[k].w; if (u <= 0) return k; } return "M"; }
 
 // sector-generated stars
-const SECTOR = 20, SECT_RANGE = 3;
+const SECTOR = 20, SECT_RANGE = MOBILE ? 2 : 3;
 const sectorCache = new Map();
 function genSector(ix, iy, iz) {
   const key = ix + "," + iy + "," + iz;
@@ -292,7 +333,7 @@ function genSector(ix, iy, iz) {
 // ================= renderer & scenes =================
 const glCanvas = document.getElementById("gl");
 let renderer;
-try { renderer = new T.WebGLRenderer({ canvas: glCanvas, antialias: true, logarithmicDepthBuffer: true }); }
+try { renderer = new T.WebGLRenderer({ canvas: glCanvas, antialias: true, logarithmicDepthBuffer: true, powerPreference: "high-performance" }); }
 catch (e) { document.getElementById("fail").hidden = false; return; }
 renderer.autoClear = false;
 renderer.setClearColor(0x000003, 1);
@@ -301,7 +342,14 @@ const galScene = new T.Scene(), sysScene = new T.Scene();
 const galCam = new T.PerspectiveCamera(FOV, 1, 1e-4, 1e9);
 const sysCam = new T.PerspectiveCamera(FOV, 1, 1e-6, 1e12);
 const camQ = new T.Quaternion();
-const cam = { p: [0, 0, 0] };
+const cam = { p: [0, 0, 0] };   // camera position in ly, relative to ORG
+// floating origin: re-centred on each star system so a double resolves millimetres at the surface
+let ORG = [0, 0, 0];
+const AC = () => [cam.p[0] + ORG[0], cam.p[1] + ORG[1], cam.p[2] + ORG[2]];
+const G = (o) => [o.g[0] - ORG[0], o.g[1] - ORG[1], o.g[2] - ORG[2]];
+const dG = (o) => Math.hypot(o.g[0] - ORG[0] - cam.p[0], o.g[1] - ORG[1] - cam.p[1], o.g[2] - ORG[2] - cam.p[2]);
+function rebase(o) { const a = AC(); ORG = o.slice(); cam.p = [a[0] - ORG[0], a[1] - ORG[1], a[2] - ORG[2]]; }
+function setAbs(a) { cam.p = [a[0] - ORG[0], a[1] - ORG[1], a[2] - ORG[2]]; }
 let W = 0, H = 0, DPR = 1;
 const ov = document.getElementById("ov"), octx = ov.getContext("2d");
 function resize() {
@@ -311,6 +359,7 @@ function resize() {
   ov.width = Math.round(W * DPR); ov.height = Math.round(H * DPR);
   for (const c of [galCam, sysCam]) { c.aspect = W / H; c.updateProjectionMatrix(); }
   for (const m of pointMats) m.uniforms.uPx.value = DPR;
+  if (typeof syncSheet === "function") syncSheet();
 }
 const pointMats = [];
 
@@ -322,6 +371,20 @@ function glowTexture(stops) {
   return new T.CanvasTexture(c);
 }
 const GLOW = glowTexture([[0, "rgba(255,255,255,1)"], [0.15, "rgba(255,255,255,0.6)"], [0.4, "rgba(255,255,255,0.12)"], [1, "rgba(255,255,255,0)"]]);
+const SPIKE = (() => {
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const g = c.getContext("2d"), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.08, "rgba(255,255,255,0.7)"); gr.addColorStop(0.3, "rgba(255,255,255,0.1)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  g.globalCompositeOperation = "lighter";
+  for (const a of [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]) {
+    g.save(); g.translate(128, 128); g.rotate(a);
+    const lg = g.createLinearGradient(-128, 0, 128, 0), w = a % (Math.PI / 2) ? 0.35 : 0.8;
+    lg.addColorStop(0, "rgba(255,255,255,0)"); lg.addColorStop(0.5, `rgba(255,255,255,${w})`); lg.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = lg; g.fillRect(-128, -1, 256, 2); g.restore();
+  }
+  return new T.CanvasTexture(c);
+})();
 const SOFT = glowTexture([[0, "rgba(255,255,255,0.9)"], [0.5, "rgba(255,255,255,0.25)"], [1, "rgba(255,255,255,0)"]]);
 
 // ---- galaxy disk texture (seen from outside) ----
@@ -376,11 +439,11 @@ galGroup.add(homeDisk);
 
 // dust points: unresolved stars sampled from the density model
 function makePointsMaterial(vs, fs) {
-  const m = new T.ShaderMaterial({ uniforms: { uPx: { value: 1 }, uFade: { value: 1 } }, vertexShader: vs, fragmentShader: fs, transparent: true, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
+  const m = new T.ShaderMaterial({ uniforms: { uPx: { value: 1 }, uFade: { value: 1 }, uRange: { value: SECTOR * (SECT_RANGE + 0.1) } }, vertexShader: vs, fragmentShader: fs, transparent: true, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
   pointMats.push(m); return m;
 }
 {
-  const N = 60000, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+  const N = MOBILE ? 24000 : 60000, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
   const r = mulberry32(4242);
   let n = 0;
   while (n < N) {
@@ -487,18 +550,18 @@ const GALAXIES = [HOME];
 
 // ---- local stars (sector points) ----
 const starMat = makePointsMaterial(
-  `uniform float uPx; attribute vec3 color; attribute float lum; varying vec3 vC; varying float vA;
+  `uniform float uPx; uniform float uRange; attribute vec3 color; attribute float lum; varying vec3 vC; varying float vA;
    void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); float d = max(length(mv.xyz), 1e-6);
      float b = lum/(d*d);
      float s = clamp(1.6 + 1.35*log2(1.0 + b*250.0), 1.4, 14.0);
-     vA = clamp(0.18 + b*300.0, 0.18, 1.0) * smoothstep(0.02, 0.09, d) * (1.0 - smoothstep(48.0, 62.0, d));
+     vA = clamp(0.18 + b*300.0, 0.18, 1.0) * smoothstep(0.02, 0.09, d) * (1.0 - smoothstep(uRange*0.78, uRange, d));
      vC = color; gl_PointSize = s*uPx; gl_Position = projectionMatrix*mv; }`,
   `uniform float uFade; varying vec3 vC; varying float vA;
    void main(){ float r = length(gl_PointCoord-0.5)*2.0; float a = exp(-r*r*5.0) + 0.25*exp(-r*r*40.0); a *= vA*uFade; if(a<0.003) discard; gl_FragColor = vec4(vC*a, 1.0); }`
 );
 let localStars = [], starPoints = null, starOrigin = [0, 0, 0], curSector = null;
 function rebuildStars(force) {
-  const ix = Math.floor(cam.p[0] / SECTOR), iy = Math.floor(cam.p[1] / SECTOR), iz = Math.floor(cam.p[2] / SECTOR);
+  const ac = AC(), ix = Math.floor(ac[0] / SECTOR), iy = Math.floor(ac[1] / SECTOR), iz = Math.floor(ac[2] / SECTOR);
   const key = ix + "," + iy + "," + iz;
   if (!force && key === curSector) return;
   curSector = key;
@@ -508,7 +571,7 @@ function rebuildStars(force) {
     const s = genSector(ix + dx, iy + dy, iz + dz);
     for (const st of s) localStars.push(st);
   }
-  if (homeStar && !localStars.includes(homeStar) && Math.hypot(homeStar.g[0] - cam.p[0], homeStar.g[1] - cam.p[1], homeStar.g[2] - cam.p[2]) < 70) localStars.push(homeStar);
+  if (homeStar && !localStars.includes(homeStar) && dG(homeStar) < 70) localStars.push(homeStar);
   starOrigin = [(ix + 0.5) * SECTOR, (iy + 0.5) * SECTOR, (iz + 0.5) * SECTOR];
   const n = localStars.length, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), lum = new Float32Array(n);
   for (let i = 0; i < n; i++) {
@@ -526,6 +589,7 @@ function rebuildStars(force) {
   starPoints.frustumCulled = false;
   galScene.add(starPoints);
 }
+
 
 // ================= planetary systems =================
 const TYPE_INFO = {
@@ -635,16 +699,12 @@ const PAL = {
 const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 function grad(stops, t) { t = clamp(t, 0, 0.9999) * (stops.length - 1); const i = Math.floor(t); return mix3(stops[i], stops[i + 1], t - i); }
 
-function planetTextures(b) {
-  const big = b.type === "planet";
-  const Wt = big ? 768 : 384, Ht = Wt / 2;
+
+// One surface model per world, shared by the orbital texture and the ground-level terrain
+function makeSurface(b) {
+  if (b.surface) return b.surface;
   const r = mulberry32(b.seed), nz = makeNoise(b.seed), nz2 = makeNoise(b.seed + 7);
-  const c = document.createElement("canvas"); c.width = Wt; c.height = Ht;
-  const g = c.getContext("2d"), img = g.createImageData(Wt, Ht), d = img.data;
-  let em = null, emd = null, cl = null, cld = null;
-  const t = b.ptype;
-  if (t === "lava") { em = document.createElement("canvas"); em.width = Wt; em.height = Ht; emd = em.getContext("2d").createImageData(Wt, Ht); }
-  if (t === "terra" || t === "aquaria" || (t === "desert" && b.pressure > 0.3) || t === "lava") { cl = document.createElement("canvas"); cl.width = Wt; cl.height = Ht; cld = cl.getContext("2d").createImageData(Wt, Ht); }
+  const t = b.ptype, gas = t === "jupiter" || t === "neptune", wet = t === "terra" || t === "aquaria";
   const ox = r() * 100, oy = r() * 100, oz = r() * 100;
   const sea = t === "aquaria" ? 0.64 : 0.5 + (r() - 0.5) * 0.08;
   const gasPal = t === "neptune" ? pick(r, [[[120, 180, 220], [80, 140, 200], [170, 215, 235], [100, 160, 210]], [[90, 150, 190], [60, 110, 160], [140, 190, 210], [70, 120, 170]]])
@@ -658,57 +718,100 @@ function planetTextures(b) {
     : t === "glacial" ? [[90, 120, 150], [170, 196, 214], [220, 232, 240], [250, 252, 255]]
     : t === "lava" ? [[16, 12, 12], [44, 32, 28], [74, 58, 50], [100, 80, 70]]
     : [[52, 50, 48], [96, 92, 88], [140, 136, 130], [178, 174, 168]];
-  const hiFreq = big ? 3.2 : 2.4;
+  const hf = 3.2;
+  const relief = { terra: 7, aquaria: 4, desert: 5, ferria: 9, selena: 6, lava: 3, glacial: 3 }[t] || 0;
+  // elevation: the first 6 octaves set the look from orbit, the rest add detail down to metres
+  function E(x, y, z, K) {
+    const X = x * hf + ox, Y = y * hf + oy, Z = z * hf + oz;
+    let s = 0, a = 0.5, f = 1;
+    for (let k = 0; k < K; k++) {
+      const v = nz.n(X * f, Y * f, Z * f);
+      s += k < 6 ? a * v : a * (v - 0.5) * 2.0;
+      f *= 2.03; a *= k < 5 ? 0.5 : 0.64;
+    }
+    return (s / 0.984375 - 0.5) * 2.1 + 0.5;
+  }
+  function heightKm(e) {
+    if (gas) return 0;
+    if (wet) return e <= sea ? 0 : relief * Math.pow((e - sea) / (1 - sea), 1.3);
+    return relief * (e - 0.5) * 1.4;
+  }
+  function color(x, y, z, e, out) {
+    const absLat = Math.abs(y);
+    let col;
+    out[3] = 0;
+    if (gas) {
+      const w = nz.fbm(x * 2 + ox, y * 2 + oy, z * 2 + oz, 4);
+      const band = y * bandF + (w - 0.5) * turb * 3;
+      let tt = 0.5 + 0.45 * Math.sin(band * 1.7) + 0.08 * Math.sin(band * 7.3);
+      if (spot) {
+        const lon = Math.atan2(z, -x), la = Math.asin(clamp(y, -1, 1));
+        const dl = Math.atan2(Math.sin(lon - spot.lon), Math.cos(lon - spot.lon)), da = la - spot.lat;
+        const q = Math.hypot(dl * 0.6, da * 1.4) / spot.s;
+        if (q < 1) tt = lerp(0.95, tt, q * q);
+      }
+      col = grad(gasPal, tt);
+      if (t === "neptune") col = mix3(col, [col[0] * 0.9, col[1] * 0.95, col[2]], 0.5);
+    } else {
+      const det = nz2.fbm(x * 12, y * 12, z * 12, 3);
+      if (wet) {
+        const ice = absLat > (t === "aquaria" ? 0.86 : 0.8) - (e - 0.5) * 0.2;
+        if (e < sea) col = grad(PAL.water, clamp(e / sea, 0, 1) ** 2);
+        else {
+          const h = (e - sea) / (1 - sea);
+          const dry = smooth(0.25, 0.05, Math.abs(absLat - 0.32)) * nz2.fbm(x * 3, y * 3, z * 3, 3);
+          col = h < 0.03 ? PAL.land[0] : grad([PAL.land[1], PAL.land[2], PAL.land[3], PAL.land[4]], h * 1.3);
+          col = mix3(col, [190, 160, 110], clamp(dry * 1.4 - 0.2, 0, 0.8));
+          col = mix3(col, [col[0] * 0.8, col[1] * 0.8, col[2] * 0.8], det * 0.6);
+        }
+        if (ice) col = mix3(col, PAL.land[5], 0.92);
+      } else if (t === "lava") {
+        const cr = 1 - Math.abs(nz2.fbm(x * 5 + 3, y * 5, z * 5, 4) * 2 - 1);
+        col = grad(rock, clamp(e, 0, 1));
+        if (cr > 0.86) { const k = (cr - 0.86) / 0.14; col = mix3(col, [255, 120, 40], k); out[3] = k; }
+      } else {
+        col = grad(rock, clamp(e * 0.8 + det * 0.3 - 0.05, 0, 1));
+        if ((t === "ferria" || t === "desert") && absLat > 0.88 && b.T < 260) col = mix3(col, [240, 240, 245], 0.85);
+        if (t === "glacial") { const cr = 1 - Math.abs(nz2.fbm(x * 6, y * 6, z * 6, 3) * 2 - 1); if (cr > 0.93) col = mix3(col, [110, 140, 175], 0.6); }
+      }
+    }
+    out[0] = col[0]; out[1] = col[1]; out[2] = col[2];
+    return out;
+  }
+  const hasClouds = wet || (t === "desert" && b.pressure > 0.3) || t === "lava";
+  function cloud(x, y, z, out) {
+    const cv = nz2.fbm(x * 3 + 9, y * 5 + 4, z * 3 + 1, 5);
+    const a = t === "lava" ? smooth(0.55, 0.75, cv) * 0.7 : smooth(0.48, 0.68, cv + (t === "aquaria" ? 0.05 : 0)) * (t === "desert" ? 0.4 : 0.95);
+    const tint = t === "lava" ? [120, 100, 90] : t === "desert" ? [230, 200, 160] : [255, 255, 255];
+    out[0] = tint[0]; out[1] = tint[1]; out[2] = tint[2]; out[3] = a;
+    return out;
+  }
+  const detail = (x, y, z, f) => nz2.n(x * f + 7.1, y * f + 3.3, z * f + 1.7);
+  return (b.surface = { E, heightKm, color, cloud, detail, hasClouds, gas, wet, hf, relief, sea, slopeCol: wet ? [104, 96, 86] : rock[1], snowKm: t === "terra" ? 4.2 : t === "aquaria" ? 3 : 1e9 });
+}
+
+function planetTextures(b) {
+  const S = makeSurface(b), big = b.type === "planet";
+  const Wt = big ? (MOBILE ? 512 : 768) : (MOBILE ? 256 : 384), Ht = Wt / 2;
+  const r = mulberry32(b.seed + 99);
+  const c = document.createElement("canvas"); c.width = Wt; c.height = Ht;
+  const g = c.getContext("2d"), img = g.createImageData(Wt, Ht), d = img.data;
+  let em = null, emd = null, cl = null, cld = null;
+  const t = b.ptype;
+  if (t === "lava") { em = document.createElement("canvas"); em.width = Wt; em.height = Ht; emd = em.getContext("2d").createImageData(Wt, Ht); }
+  if (S.hasClouds) { cl = document.createElement("canvas"); cl.width = Wt; cl.height = Ht; cld = cl.getContext("2d").createImageData(Wt, Ht); }
+  const c4 = [0, 0, 0, 0], k4 = [0, 0, 0, 0];
   for (let j = 0; j < Ht; j++) {
     const lat = ((j + 0.5) / Ht) * Math.PI, sl = Math.sin(lat), y = Math.cos(lat);
-    const absLat = Math.abs(y);
     for (let i = 0; i < Wt; i++) {
-      const lon = (i / Wt) * TAU, x = sl * Math.cos(lon), z = sl * Math.sin(lon);
-      let col, o = (j * Wt + i) * 4;
-      if (t === "jupiter" || t === "neptune") {
-        const w = nz.fbm(x * 2 + ox, y * 2 + oy, z * 2 + oz, 4);
-        let band = y * bandF + (w - 0.5) * turb * 3;
-        let tt = 0.5 + 0.5 * Math.sin(band * 1.7) * 0.9 + 0.08 * Math.sin(band * 7.3);
-        if (spot) {
-          const dl = Math.atan2(Math.sin(lon - spot.lon), Math.cos(lon - spot.lon)), da = (Math.PI / 2 - lat) - spot.lat;
-          const q = Math.hypot(dl * 0.6, da * 1.4) / spot.s;
-          if (q < 1) tt = lerp(0.95, tt, q * q);
-        }
-        col = grad(gasPal, tt);
-        if (t === "neptune") col = mix3(col, [col[0] * 0.9, col[1] * 0.95, col[2]], 0.5);
-      } else {
-        let e = nz.fbm(x * hiFreq + ox, y * hiFreq + oy, z * hiFreq + oz, 6);
-        e = (e - 0.5) * 2.1 + 0.5;
-        const det = nz2.fbm(x * 12, y * 12, z * 12, 3);
-        if (t === "terra" || t === "aquaria") {
-          const ice = absLat > (t === "aquaria" ? 0.86 : 0.8) - (e - 0.5) * 0.2;
-          if (e < sea) col = grad(PAL.water, clamp(e / sea, 0, 1) ** 2);
-          else {
-            const h = (e - sea) / (1 - sea);
-            const dry = smooth(0.25, 0.05, Math.abs(absLat - 0.32)) * nz2.fbm(x * 3, y * 3, z * 3, 3);
-            col = h < 0.03 ? PAL.land[0] : grad([PAL.land[1], PAL.land[2], PAL.land[3], PAL.land[4]], h * 1.3);
-            col = mix3(col, [190, 160, 110], clamp(dry * 1.4 - 0.2, 0, 0.8));
-            col = mix3(col, [col[0] * 0.8, col[1] * 0.8, col[2] * 0.8], det * 0.6);
-          }
-          if (ice) col = mix3(col, PAL.land[5], 0.92);
-        } else if (t === "lava") {
-          const cr = 1 - Math.abs(nz2.fbm(x * 5 + 3, y * 5, z * 5, 4) * 2 - 1);
-          col = grad(rock, e);
-          if (cr > 0.86) { const k = (cr - 0.86) / 0.14; col = mix3(col, [255, 120, 40], k); emd.data[o] = 255 * k; emd.data[o + 1] = 110 * k; emd.data[o + 2] = 30 * k; }
-          if (emd) emd.data[o + 3] = 255;
-        } else {
-          col = grad(rock, clamp(e * 0.8 + det * 0.3 - 0.05, 0, 1));
-          if ((t === "ferria" || t === "desert") && absLat > 0.88 && b.T < 260) col = mix3(col, [240, 240, 245], 0.85);
-          if (t === "glacial") { const cr = 1 - Math.abs(nz2.fbm(x * 6, y * 6, z * 6, 3) * 2 - 1); if (cr > 0.93) col = mix3(col, [110, 140, 175], 0.6); }
-        }
-      }
-      d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = 255;
-      if (cld) {
-        const cv = nz2.fbm(x * 3 + 9, y * 5 + 4, z * 3 + 1, 5);
-        const a = t === "lava" ? smooth(0.55, 0.75, cv) * 0.7 : smooth(0.48, 0.68, cv + (t === "aquaria" ? 0.05 : 0)) * (t === "desert" ? 0.4 : 0.95);
-        const tint = t === "lava" ? [120, 100, 90] : t === "desert" ? [230, 200, 160] : [255, 255, 255];
-        cld.data[o] = tint[0]; cld.data[o + 1] = tint[1]; cld.data[o + 2] = tint[2]; cld.data[o + 3] = a * 255;
-      }
+      // matches THREE.SphereGeometry's mapping so terrain and texture line up
+      const lon = (i / Wt) * TAU, x = -sl * Math.cos(lon), z = sl * Math.sin(lon);
+      const e = S.gas ? 0 : S.E(x, y, z, 6);
+      S.color(x, y, z, e, c4);
+      const o = (j * Wt + i) * 4;
+      d[o] = c4[0]; d[o + 1] = c4[1]; d[o + 2] = c4[2]; d[o + 3] = 255;
+      if (emd) { emd.data[o] = 255 * c4[3]; emd.data[o + 1] = 110 * c4[3]; emd.data[o + 2] = 30 * c4[3]; emd.data[o + 3] = 255; }
+      if (cld) { S.cloud(x, y, z, k4); cld.data[o] = k4[0]; cld.data[o + 1] = k4[1]; cld.data[o + 2] = k4[2]; cld.data[o + 3] = k4[3] * 255; }
     }
   }
   g.putImageData(img, 0, 0);
@@ -775,12 +878,50 @@ void main(){
 }`;
 const ATMO_COL = { terra: [0.4, 0.65, 1], aquaria: [0.45, 0.7, 1], desert: [1, 0.78, 0.55], ferria: [1, 0.7, 0.6], lava: [1, 0.5, 0.25], glacial: [0.7, 0.85, 1], jupiter: [0.95, 0.85, 0.7], neptune: [0.45, 0.8, 1] };
 
+const SKY_COL = { terra: [0.3, 0.55, 1.0], aquaria: [0.34, 0.6, 1.0], desert: [0.85, 0.66, 0.46], ferria: [0.82, 0.58, 0.46], lava: [0.9, 0.5, 0.3], glacial: [0.55, 0.7, 0.95], selena: [0.6, 0.6, 0.6] };
+const isRocky = (o) => o && o.kind === "body" && o.type !== "star" && o.ptype !== "jupiter" && o.ptype !== "neptune";
+
 // ---------- system lifecycle ----------
-let sys = null; // {star, bodies, group, light}
+let sys = null;
 const sysGroup = new T.Group(); sysScene.add(sysGroup);
 sysScene.add(new T.AmbientLight(0xffffff, 0.035));
 const orbitGroup = new T.Group(); sysScene.add(orbitGroup);
+const terrainGroup = new T.Group(); sysScene.add(terrainGroup);
+sysScene.fog = new T.Fog(0x000000, 1e12, 1e13);
 let showOrbits = true, showLabels = true;
+const NF = { fog: false };
+
+// sky seen from inside an atmosphere: blue by day, red at dusk, transparent at night
+const skyDomeMat = new T.ShaderMaterial({
+  uniforms: { uSun: { value: new T.Vector3(0, 1, 0) }, uUp: { value: new T.Vector3(0, 1, 0) }, uCol: { value: new T.Vector3(0.3, 0.55, 1) }, uDens: { value: 0 } },
+  vertexShader: `#include <common>
+#include <logdepthbuf_pars_vertex>
+varying vec3 vDir;
+void main(){ vDir = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);
+#include <logdepthbuf_vertex>
+}`,
+  fragmentShader: `#include <logdepthbuf_pars_fragment>
+uniform vec3 uSun; uniform vec3 uUp; uniform vec3 uCol; uniform float uDens; varying vec3 vDir;
+void main(){
+#include <logdepthbuf_fragment>
+  vec3 d = normalize(vDir);
+  float mu = dot(d, uUp), sm = dot(uSun, uUp);
+  float day = smoothstep(-0.2, 0.1, sm);
+  float h = 1.0 - clamp(mu, 0.0, 1.0);
+  vec3 sky = mix(uCol*0.62, mix(uCol, vec3(1.0), 0.6), pow(h, 4.0));
+  float cs = max(dot(d, uSun), 0.0);
+  float dusk = 1.0 - smoothstep(0.0, 0.32, abs(sm + 0.03));
+  sky = mix(sky, vec3(1.0, 0.42, 0.18), dusk*pow(h, 5.0)*(0.3 + 0.7*pow(cs, 3.0)));
+  vec3 c = sky*max(day, dusk*0.6) + vec3(1.0, 0.92, 0.8)*(pow(cs, 900.0)*6.0 + pow(cs, 24.0)*0.45)*max(day, dusk);
+  float a = uDens*clamp(day*0.96 + dusk*0.55*pow(h, 3.0), 0.0, 0.97);
+  if (mu < -0.02) a = uDens*0.97*day;
+  gl_FragColor = vec4(c, a);
+}`,
+  side: T.BackSide, transparent: true, depthWrite: false,
+});
+const skyDome = new T.Mesh(new T.SphereGeometry(1, 64, 32), skyDomeMat);
+skyDome.renderOrder = -1; skyDome.visible = false; skyDome.frustumCulled = false;
+sysScene.add(skyDome);
 
 function loadSystem(star) {
   unloadSystem();
@@ -794,34 +935,36 @@ function loadSystem(star) {
     b.root = root;
     if (b.type === "star") {
       if (star.cls === "X") {
-        root.add(new T.Mesh(new T.SphereGeometry(b.r, 48, 32), new T.MeshBasicMaterial({ color: 0x000000 })));
-        const disk = new T.Mesh(new T.RingGeometry(b.r * 2.6, b.r * 14, 160, 1), new T.MeshBasicMaterial({ map: diskTexture(), transparent: true, blending: T.AdditiveBlending, side: T.DoubleSide, depthWrite: false }));
+        root.add(new T.Mesh(new T.SphereGeometry(b.r, 48, 32), new T.MeshBasicMaterial({ color: 0x000000, ...NF })));
+        const disk = new T.Mesh(new T.RingGeometry(b.r * 2.6, b.r * 14, 160, 1), new T.MeshBasicMaterial({ map: diskTexture(), transparent: true, blending: T.AdditiveBlending, side: T.DoubleSide, depthWrite: false, ...NF }));
         fixRingUV(disk.geometry, b.r * 2.6, b.r * 14);
         disk.rotation.x = Math.PI / 2 - 0.25; root.add(disk); b.disk = disk;
-        const halo = new T.Sprite(new T.SpriteMaterial({ map: SOFT, color: 0xffb070, blending: T.AdditiveBlending, depthWrite: false, opacity: 0.5 }));
+        const ring = new T.Mesh(new T.RingGeometry(b.r * 1.02, b.r * 1.5, 96, 1), new T.MeshBasicMaterial({ color: 0xffc890, transparent: true, opacity: 0.7, blending: T.AdditiveBlending, side: T.DoubleSide, depthWrite: false, ...NF }));
+        root.add(ring); b.photonRing = ring;
+        const halo = new T.Sprite(new T.SpriteMaterial({ map: SOFT, color: 0xffb070, blending: T.AdditiveBlending, depthWrite: false, opacity: 0.5, ...NF }));
         halo.scale.setScalar(b.r * 9); root.add(halo);
       } else {
-        root.add(new T.Mesh(new T.SphereGeometry(b.r, 64, 48), new T.MeshBasicMaterial({ map: starTexture(star.seed, C.col) })));
-        const cor = new T.Sprite(new T.SpriteMaterial({ map: GLOW, color: sc, blending: T.AdditiveBlending, depthWrite: false }));
+        root.add(new T.Mesh(new T.SphereGeometry(b.r, 64, 48), new T.MeshBasicMaterial({ map: starTexture(star.seed, C.col), ...NF })));
+        const cor = new T.Sprite(new T.SpriteMaterial({ map: GLOW, color: sc, blending: T.AdditiveBlending, depthWrite: false, ...NF }));
         cor.scale.setScalar(b.r * 6); root.add(cor);
-        const cor2 = new T.Sprite(new T.SpriteMaterial({ map: SOFT, color: sc, blending: T.AdditiveBlending, depthWrite: false, opacity: 0.35 }));
+        const cor2 = new T.Sprite(new T.SpriteMaterial({ map: SOFT, color: sc, blending: T.AdditiveBlending, depthWrite: false, opacity: 0.35, ...NF }));
         cor2.scale.setScalar(b.r * 16); root.add(cor2);
         if (star.cls === "N") {
-          const beamMat = new T.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.25, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide });
+          const beamMat = new T.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.25, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, ...NF });
           const beams = new T.Group();
           for (const s of [1, -1]) { const cone = new T.Mesh(new T.ConeGeometry(b.r * 30, b.r * 900, 24, 1, true), beamMat); cone.position.y = s * b.r * 450; cone.rotation.x = s > 0 ? Math.PI : 0; beams.add(cone); }
           beams.rotation.z = 0.5; root.add(beams); b.beams = beams;
         }
       }
-      // point-like glare that keeps the star visible from far away
-      const glare = new T.Sprite(new T.SpriteMaterial({ map: GLOW, color: sc, blending: T.AdditiveBlending, depthWrite: false, depthTest: false, sizeAttenuation: false }));
+      const glare = new T.Sprite(new T.SpriteMaterial({ map: SPIKE, color: sc, blending: T.AdditiveBlending, depthWrite: false, depthTest: false, sizeAttenuation: false, ...NF }));
       glare.renderOrder = 5; root.add(glare); b.glare = glare;
     } else {
       const tilt = new T.Group(); tilt.rotation.z = b.tilt; root.add(tilt); b.tiltG = tilt;
       const gas = b.ptype === "jupiter" || b.ptype === "neptune";
       const avg = { terra: 0x2d5a7a, aquaria: 0x1d4f86, desert: 0xc49a5e, ferria: 0x9a5a36, lava: 0x3a2a24, selena: 0x8a8682, glacial: 0xd4e2ee, jupiter: 0xc8a882, neptune: 0x6aa8d8 }[b.ptype];
-      b.mat = new T.MeshStandardMaterial({ color: avg, roughness: gas ? 1 : 0.92, metalness: 0 });
-      b.surf = new T.Mesh(new T.SphereGeometry(b.r, b.type === "planet" ? 96 : 48, b.type === "planet" ? 64 : 32), b.mat);
+      b.mat = new T.MeshStandardMaterial({ color: avg, roughness: gas ? 1 : 0.92, metalness: 0, ...NF });
+      const seg = b.type === "planet" ? (MOBILE ? 64 : 96) : 48;
+      b.surf = new T.Mesh(new T.SphereGeometry(b.r, seg, Math.round(seg * 0.66)), b.mat);
       tilt.add(b.surf);
       const ac = ATMO_COL[b.ptype];
       if (ac && (gas || b.pressure > 0.005)) {
@@ -831,20 +974,24 @@ function loadSystem(star) {
         }));
         root.add(b.atmoMesh);
       }
+      if (!gas && b.pressure > 0.005) {
+        b.atmoH = 0.04 + 0.06 * Math.min(Math.sqrt(b.pressure), 2);
+        b.skyDens = clamp(Math.sqrt(b.pressure), 0.1, 1);
+        b.skyCol = SKY_COL[b.ptype] || [0.5, 0.6, 0.8];
+      }
       if (b.rings) {
-        const ri = b.r * 1.3, ro = b.r * (2 + Math.random() * 0.6);
+        const ri = b.r * 1.3, ro = b.r * (2 + (b.seed % 60) / 100);
         const rg = new T.RingGeometry(ri, ro, 180, 1); fixRingUV(rg, ri, ro);
-        const ring = new T.Mesh(rg, new T.MeshLambertMaterial({ map: ringTexture(b.seed), transparent: true, side: T.DoubleSide, depthWrite: false }));
+        const ring = new T.Mesh(rg, new T.MeshLambertMaterial({ map: ringTexture(b.seed), transparent: true, side: T.DoubleSide, depthWrite: false, ...NF }));
         ring.rotation.x = Math.PI / 2; tilt.add(ring);
       }
-      // orbit line
       const pts = [];
       for (let k = 0; k <= 256; k++) {
         const ang = (k / 256) * TAU, x = Math.cos(ang) * b.a, z0 = Math.sin(ang) * b.a;
         const y = z0 * Math.sin(b.incl), z = z0 * Math.cos(b.incl), cn = Math.cos(b.node), sn = Math.sin(b.node);
         pts.push(new T.Vector3(x * cn - z * sn, y, x * sn + z * cn));
       }
-      b.orbit = new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: b.type === "moon" ? 0x6a8aa8 : 0x5aa8d8, transparent: true, opacity: b.type === "moon" ? 0.28 : 0.4, depthWrite: false }));
+      b.orbit = new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: b.type === "moon" ? 0x6a8aa8 : 0x5aa8d8, transparent: true, opacity: 0.4, depthWrite: false, ...NF }));
       b.orbit.frustumCulled = false;
       orbitGroup.add(b.orbit);
     }
@@ -869,15 +1016,18 @@ function diskTexture() {
 }
 function unloadSystem() {
   if (!sys) return;
+  for (const b of sys.bodies) if (b.terrain) { disposeTerrain(b.terrain); b.terrain = null; }
+  const keep = new Set([GLOW, SOFT, SPIKE, diskTex]);
   const kill = (o) => o.traverse((m) => {
     if (m.geometry) m.geometry.dispose();
-    if (m.material) { for (const k of ["map", "emissiveMap"]) if (m.material[k] && m.material[k] !== GLOW && m.material[k] !== SOFT && m.material[k] !== diskTex) m.material[k].dispose(); m.material.dispose(); }
+    if (m.material) { for (const k of ["map", "emissiveMap"]) if (m.material[k] && !keep.has(m.material[k])) m.material[k].dispose(); m.material.dispose(); }
   });
   kill(sysGroup); kill(orbitGroup);
-  sysGroup.clear(); orbitGroup.clear();
+  sysGroup.clear(); orbitGroup.clear(); terrainGroup.clear();
   sysScene.remove(sys.light);
+  skyDome.visible = false; sysScene.fog.near = 1e12; sysScene.fog.far = 1e13;
   if (selected && selected.kind === "body") selected = sys.star;
-  if (follow && follow.kind === "body") { follow = null; }
+  if (follow && follow.kind === "body") follow = null;
   sys = null;
 }
 function texturize(b) {
@@ -886,31 +1036,217 @@ function texturize(b) {
   if (tx.emissive) { b.mat.emissiveMap = tx.emissive; b.mat.emissive.set(0xffffff); b.mat.emissiveIntensity = 1; }
   b.mat.needsUpdate = true;
   if (tx.clouds) {
-    b.clouds = new T.Mesh(new T.SphereGeometry(b.r * 1.012, 96, 64), new T.MeshStandardMaterial({ map: tx.clouds, transparent: true, depthWrite: false, roughness: 1 }));
+    b.clouds = new T.Mesh(new T.SphereGeometry(b.r * 1.012, MOBILE ? 64 : 96, MOBILE ? 42 : 64), new T.MeshStandardMaterial({ map: tx.clouds, transparent: true, depthWrite: false, roughness: 1, side: T.DoubleSide, ...NF }));
     b.tiltG.add(b.clouds);
   }
   b.texReady = true;
 }
 
+// ================= terrain: quadtree cube-sphere streamed by distance =================
+const TN = MOBILE ? 16 : 24;
+const T_MAXD = 19;
+const T_BUDGET = MOBILE ? 5 : 8;
+const FACES = [
+  [[1, 0, 0], [0, 0, -1], [0, 1, 0]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]],
+  [[0, 1, 0], [1, 0, 0], [0, 0, -1]], [[0, -1, 0], [1, 0, 0], [0, 0, 1]],
+  [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [-1, 0, 0], [0, 1, 0]],
+];
+function cubeDir(f, u, v, out) {
+  const F = FACES[f], uu = Math.tan((u * Math.PI) / 4), vv = Math.tan((v * Math.PI) / 4);
+  const x = F[0][0] + F[1][0] * uu + F[2][0] * vv, y = F[0][1] + F[1][1] * uu + F[2][1] * vv, z = F[0][2] + F[1][2] * uu + F[2][2] * vv;
+  const l = Math.hypot(x, y, z); out[0] = x / l; out[1] = y / l; out[2] = z / l; return out;
+}
+let tIndex = null;
+function terrainIndex() {
+  if (tIndex) return tIndex;
+  const N = TN, V = N + 1, idx = [];
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const a = j * V + i, b = a + 1, c = a + V, d = c + 1; idx.push(a, b, c, b, d, c); }
+  const edge = [];
+  for (let i = 0; i < V; i++) edge.push(i);
+  for (let j = 1; j < V; j++) edge.push(j * V + N);
+  for (let i = N - 1; i >= 0; i--) edge.push(N * V + i);
+  for (let j = N - 1; j >= 1; j--) edge.push(j * V);
+  const base = V * V, E = edge.length;
+  for (let k = 0; k < E; k++) { const a = edge[k], b = edge[(k + 1) % E]; const a2 = base + k, b2 = base + ((k + 1) % E); idx.push(a, a2, b, b, a2, b2, a, b, a2, b, b2, a2); }
+  return (tIndex = { idx: new T.Uint16BufferAttribute(idx, 1), edge, E });
+}
+const terrainMat = new T.MeshLambertMaterial({ vertexColors: true });
+function tNode(b, f, u0, v0, size, depth) {
+  const c = cubeDir(f, u0 + size / 2, v0 + size / 2, [0, 0, 0]);
+  return { f, u0, v0, size, depth, c: [c[0] * b.r, c[1] * b.r, c[2] * b.r], edge: (size * b.r * Math.PI) / 4, mesh: null, kids: null };
+}
+function makeTerrain(b) {
+  const roots = [];
+  for (let f = 0; f < 6; f++) roots.push(tNode(b, f, -1, -1, 2, 0));
+  return { b, S: makeSurface(b), roots };
+}
+function buildChunk(t, n) {
+  const b = t.b, S = t.S, N = TN, B = N + 3, R = b.r;
+  const spacing = n.edge / N;
+  const K = clamp(Math.ceil(Math.log(R / (S.hf * 2 * spacing)) / Math.log(2.03)) + 1, 6, 24);
+  const P = new Float64Array(B * B * 3), D = new Float64Array(B * B * 3), EV = new Float32Array(B * B), HH = new Float32Array(B * B);
+  const d = [0, 0, 0];
+  for (let j = 0; j < B; j++) for (let i = 0; i < B; i++) {
+    cubeDir(n.f, n.u0 + ((i - 1) / N) * n.size, n.v0 + ((j - 1) / N) * n.size, d);
+    const e = S.E(d[0], d[1], d[2], K), h = S.heightKm(e) / 1000, k = j * B + i, rr = R + h;
+    P[k * 3] = d[0] * rr; P[k * 3 + 1] = d[1] * rr; P[k * 3 + 2] = d[2] * rr;
+    D[k * 3] = d[0]; D[k * 3 + 1] = d[1]; D[k * 3 + 2] = d[2];
+    EV[k] = e; HH[k] = h;
+  }
+  const V = N + 1, ti = terrainIndex(), nv = V * V + ti.E;
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3);
+  const ck = (N / 2 + 1) * B + (N / 2 + 1), cx = P[ck * 3], cy = P[ck * 3 + 1], cz = P[ck * 3 + 2];
+  const c4 = [0, 0, 0, 0], df = R / (spacing * 5);
+  for (let j = 0; j < V; j++) for (let i = 0; i < V; i++) {
+    const k = (j + 1) * B + (i + 1), o = (j * V + i) * 3;
+    pos[o] = P[k * 3] - cx; pos[o + 1] = P[k * 3 + 1] - cy; pos[o + 2] = P[k * 3 + 2] - cz;
+    const kl = (k - 1) * 3, kr = (k + 1) * 3, ku = (k - B) * 3, kd = (k + B) * 3;
+    const ax = P[kr] - P[kl], ay = P[kr + 1] - P[kl + 1], az = P[kr + 2] - P[kl + 2];
+    const bx = P[kd] - P[ku], by = P[kd + 1] - P[ku + 1], bz = P[kd + 2] - P[ku + 2];
+    let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+    const dx = D[k * 3], dy = D[k * 3 + 1], dz = D[k * 3 + 2];
+    if (nx * dx + ny * dy + nz * dz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+    nor[o] = nx; nor[o + 1] = ny; nor[o + 2] = nz;
+    S.color(dx, dy, dz, EV[k], c4);
+    let cr = c4[0], cg = c4[1], cb = c4[2];
+    const hkm = HH[k] * 1000;
+    if (!S.gas && (hkm > 0.002 || !S.wet)) {
+      const slope = 1 - (nx * dx + ny * dy + nz * dz);
+      const m = clamp((slope - 0.08) * 5, 0, 0.85);
+      cr = lerp(cr, S.slopeCol[0], m); cg = lerp(cg, S.slopeCol[1], m); cb = lerp(cb, S.slopeCol[2], m);
+      if (hkm > S.snowKm && slope < 0.25) { const s = clamp((hkm - S.snowKm) / 0.8, 0, 0.9); cr = lerp(cr, 245, s); cg = lerp(cg, 248, s); cb = lerp(cb, 252, s); }
+    }
+    if (!(S.wet && hkm <= 0.002)) {
+      const dv = 0.82 + 0.22 * S.detail(dx, dy, dz, df) + 0.14 * S.detail(dx, dy, dz, df * 4.3);
+      cr *= dv; cg *= dv; cb *= dv;
+    }
+    col[o] = Math.min(cr / 255, 1); col[o + 1] = Math.min(cg / 255, 1); col[o + 2] = Math.min(cb / 255, 1);
+  }
+  const drop = n.edge * 0.04;
+  for (let k = 0; k < ti.E; k++) {
+    const s = ti.edge[k], o = (V * V + k) * 3, so = s * 3, j = Math.floor(s / V), i = s % V, kk = ((j + 1) * B + (i + 1)) * 3;
+    pos[o] = pos[so] - D[kk] * drop; pos[o + 1] = pos[so + 1] - D[kk + 1] * drop; pos[o + 2] = pos[so + 2] - D[kk + 2] * drop;
+    nor[o] = nor[so]; nor[o + 1] = nor[so + 1]; nor[o + 2] = nor[so + 2];
+    col[o] = col[so]; col[o + 1] = col[so + 1]; col[o + 2] = col[so + 2];
+  }
+  const geo = new T.BufferGeometry();
+  geo.setAttribute("position", new T.BufferAttribute(pos, 3));
+  geo.setAttribute("normal", new T.BufferAttribute(nor, 3));
+  geo.setAttribute("color", new T.BufferAttribute(col, 3));
+  geo.setIndex(ti.idx);
+  geo.computeBoundingSphere();
+  const m = new T.Mesh(geo, terrainMat);
+  m.visible = false;
+  terrainGroup.add(m);
+  n.mesh = m; n.cc = [cx, cy, cz];
+}
+function freeKids(n) {
+  for (const k of n.kids) {
+    if (k.kids) freeKids(k);
+    if (k.mesh) { terrainGroup.remove(k.mesh); k.mesh.geometry.dispose(); k.mesh = null; }
+  }
+  n.kids = null;
+}
+function disposeTerrain(t) {
+  for (const r of t.roots) { if (r.kids) freeKids(r); if (r.mesh) { terrainGroup.remove(r.mesh); r.mesh.geometry.dispose(); r.mesh = null; } }
+}
+function terrainSelect(t, camB) {
+  const draw = [], need = [];
+  const visit = (n) => {
+    const d = Math.hypot(camB[0] - n.c[0], camB[1] - n.c[1], camB[2] - n.c[2]);
+    const split = n.depth < T_MAXD && d < n.edge * 2.1;
+    if (split) {
+      if (!n.kids) { const h = n.size / 2; n.kids = [tNode(t.b, n.f, n.u0, n.v0, h, n.depth + 1), tNode(t.b, n.f, n.u0 + h, n.v0, h, n.depth + 1), tNode(t.b, n.f, n.u0, n.v0 + h, h, n.depth + 1), tNode(t.b, n.f, n.u0 + h, n.v0 + h, h, n.depth + 1)]; }
+      if (n.kids.every((k) => k.mesh)) { for (const k of n.kids) visit(k); return; }
+      for (const k of n.kids) if (!k.mesh) need.push({ n: k, d });
+    } else if (n.kids && d > n.edge * 2.8) freeKids(n);
+    if (n.mesh) draw.push(n); else need.push({ n, d });
+  };
+  for (const r of t.roots) visit(r);
+  need.sort((a, b) => a.n.depth - b.n.depth || a.d - b.d);
+  const t0 = performance.now();
+  for (const q of need) { if (performance.now() - t0 > T_BUDGET) break; if (!q.n.mesh) buildChunk(t, q.n); }
+  return draw;
+}
+
+// ---------- body orientation & ground ----------
+const QA = new T.Quaternion(), QB = new T.Quaternion(), AXZ = new T.Vector3(0, 0, 1), AXY = new T.Vector3(0, 1, 0);
+function bodyQuat(b, out) {
+  if (b.type === "star") return out.set(0, 0, 0, 1);
+  QA.setFromAxisAngle(AXZ, b.tilt); QB.setFromAxisAngle(AXY, (simT * b.spin) % TAU);
+  return out.copy(QA).multiply(QB);
+}
+const gq = new T.Quaternion(), gv = new T.Vector3();
+function groundHeightDir(b, D) {
+  if (!isRocky(b)) return 0;
+  bodyQuat(b, gq).invert();
+  gv.copy(D).normalize().applyQuaternion(gq);
+  const S = makeSurface(b);
+  return S.heightKm(S.E(gv.x, gv.y, gv.z, 22)) / 1000;
+}
+
+// ================= nebulae =================
+const NEBULAE = [];
+function makeNebulae(center) {
+  const r = mulberry32(8080);
+  const specs = [
+    ["Lantern Nebula", "Emission nebula", [1, 0.32, 0.42], [0.35, 0.85, 0.8], 34],
+    ["Corrin Veil", "Supernova remnant", [0.4, 0.75, 1], [1, 0.4, 0.45], 22],
+    ["Ashfall Nebula", "Emission nebula", [1, 0.4, 0.5], [1, 0.72, 0.38], 48],
+    ["Pale Reach", "Reflection nebula", [0.45, 0.6, 1], [0.75, 0.82, 1], 18],
+    ["Kestrel Eye", "Planetary nebula", [0.3, 0.92, 0.85], [1, 0.35, 0.4], 1.6],
+    ["Tamsin Cloud", "Emission nebula", [1, 0.3, 0.4], [0.5, 0.7, 1], 60],
+  ];
+  for (const [name, type, c1, c2, rad] of specs) {
+    const dist = 180 + r() * 1800, th = r() * TAU;
+    const g = [center[0] + Math.cos(th) * dist, center[1] + (r() - 0.5) * 120, center[2] + Math.sin(th) * dist];
+    const neb = { kind: "nebula", name, type, g, radius: rad, sprites: [] };
+    const grp = new T.Group(); grp.position.set(g[0], g[1], g[2]);
+    const planetary = type === "Planetary nebula";
+    const n = planetary ? 46 : 70;
+    for (let k = 0; k < n; k++) {
+      const col = new T.Color().setRGB(...(r() < 0.6 ? c1 : c2));
+      const sp = new T.Sprite(new T.SpriteMaterial({ map: SOFT, color: col, blending: T.AdditiveBlending, depthTest: false, depthWrite: false, transparent: true, opacity: 0.1 }));
+      let x, y, z;
+      if (planetary) { const a = r() * TAU, rr = rad * (0.75 + r() * 0.3); x = Math.cos(a) * rr; y = (r() - 0.5) * rad * 0.5; z = Math.sin(a) * rr * 0.7; }
+      else { x = gauss(r) * rad * 0.45; y = gauss(r) * rad * 0.25; z = gauss(r) * rad * 0.45; }
+      sp.position.set(x, y, z);
+      sp.scale.setScalar(rad * (planetary ? 0.5 : 0.35 + r() * 0.6));
+      sp.userData.base = planetary ? 0.16 : 0.07 + r() * 0.06;
+      grp.add(sp); neb.sprites.push(sp);
+    }
+    if (planetary) {
+      const core = new T.Sprite(new T.SpriteMaterial({ map: GLOW, color: 0xdfefff, blending: T.AdditiveBlending, depthTest: false, depthWrite: false }));
+      core.scale.setScalar(rad * 0.2); core.userData.base = 1; grp.add(core); neb.sprites.push(core);
+    }
+    galGroup.add(grp);
+    neb.group = grp;
+    NEBULAE.push(neb);
+  }
+}
+
 // ================= object positions (ly, doubles) =================
 const tmp3 = [0, 0, 0];
 function posOf(o, out = [0, 0, 0]) {
-  if (o.kind === "star" || o.kind === "galaxy") { out[0] = o.g[0]; out[1] = o.g[1]; out[2] = o.g[2]; return out; }
-  const s = o.star.g;
+  if (o.kind !== "body") { out[0] = o.g[0] - ORG[0]; out[1] = o.g[1] - ORG[1]; out[2] = o.g[2] - ORG[2]; return out; }
+  const s = G(o.star);
   out[0] = s[0] + o.pos[0] / LY; out[1] = s[1] + o.pos[1] / LY; out[2] = s[2] + o.pos[2] / LY;
   return out;
 }
-function radiusOf(o) { return o.kind === "galaxy" ? o.radius : o.kind === "star" ? o.Rm / LY : o.r / LY; }
+function radiusOf(o) { return o.kind === "galaxy" || o.kind === "nebula" ? o.radius : o.kind === "star" ? o.Rm / LY : o.r / LY; }
 function dist3(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); }
 
 // ================= state =================
 let simT = 0, timeRate = 1, paused = false;
 const RATES = [1, 10, 60, 600, 3600, 86400, 604800, 2629800, 31557600];
 let rateI = 0;
-let selected = null, follow = null, followOff = [0, 0, 0]; // followOff in Mm
+let selected = null, follow = null, followOff = [0, 0, 0], followOffB = [0, 0, 0];
+const qPrev = new T.Quaternion(), qNow = new T.Quaternion();
 let speedMul = 1;
-let goto = null;
+let goto = null, orient = null;
 let homeStar = null, homeWorld = null;
+let ground = null; // {b, alt (Mm above terrain), h}
 
 function findHome() {
   const R = 16200, th = (PITCH_K * Math.log(R / 1000)) % Math.PI;
@@ -922,77 +1258,91 @@ function findHome() {
   if (!best) best = localStars[0];
   best.forceTerra = true; best.name = "Halcyon"; best.sub = 2; best.L = 1.05; best.M = 1.02; best.Rm = 705; best.T = 5790;
   homeStar = best;
+  makeNebulae(best.g);
 }
 function goHome(instant) {
-  if (!sys || sys.star !== homeStar) { cam.p = homeStar.g.slice(); rebuildStars(true); loadSystem(homeStar); }
+  if (!sys || sys.star !== homeStar) { setAbs(homeStar.g); rebase(homeStar.g); rebuildStars(true); loadSystem(homeStar); }
   homeWorld = sys.bodies.find((b) => b.ptype === "terra" && b.type === "planet");
-  homeWorld.name = "Halcyon c"; homeWorld.cls = "Temperate Terra";
-  if (homeWorld.life === "None") { homeWorld.life = "Multicellular · land & marine"; homeWorld.atmo = "N₂ 76% · O₂ 22% · Ar 1%"; }
-  // moons get renamed with the planet
-  for (const b of sys.bodies) if (b.parent === homeWorld) b.name = "Halcyon c " + b.name.split(" ").pop();
+  if (homeWorld.name !== "Halcyon c") {
+    homeWorld.name = "Halcyon c"; homeWorld.cls = "Temperate Terra";
+    if (homeWorld.life === "None") { homeWorld.life = "Multicellular · land & marine"; homeWorld.atmo = "N₂ 76% · O₂ 22% · Ar 1%"; }
+    for (const b of sys.bodies) if (b.parent === homeWorld) b.name = "Halcyon c " + b.name.split(" ").pop();
+  }
   updateBodies();
   const pp = homeWorld.pos;
   const toStar = new T.Vector3(-pp[0], -pp[1], -pp[2]).normalize();
   const off = toStar.applyAxisAngle(new T.Vector3(0, 1, 0), 0.75).multiplyScalar(homeWorld.r * 3.4);
   off.y += homeWorld.r * 0.6;
   if (instant) {
-    followOff = [off.x, off.y, off.z]; follow = homeWorld; selected = homeWorld;
+    selected = homeWorld;
     posOf(homeWorld, cam.p); cam.p[0] += off.x / LY; cam.p[1] += off.y / LY; cam.p[2] += off.z / LY;
-    lookAtObj(homeWorld, 1);
+    setFollowOff(homeWorld);
+    camQ.copy(lookQuat(homeWorld));
   } else { selected = homeWorld; startGoto(homeWorld); }
   renderInfo();
 }
-
-// ================= bodies update =================
-function updateBodies() {
-  if (!sys) return;
-  for (const b of sys.bodies) bodyLocal(b, simT, b.pos);
-}
+function updateBodies() { if (sys) for (const b of sys.bodies) bodyLocal(b, simT, b.pos); }
 
 // ================= camera helpers =================
-const vF = new T.Vector3(), vR = new T.Vector3(), vU = new T.Vector3(), tq = new T.Quaternion(), tm = new T.Matrix4();
+const vF = new T.Vector3(), vR = new T.Vector3(), vU = new T.Vector3(), tq = new T.Quaternion(), tm = new T.Matrix4(), ORIGIN = new T.Vector3();
 function camAxes() { vF.set(0, 0, -1).applyQuaternion(camQ); vR.set(1, 0, 0).applyQuaternion(camQ); vU.set(0, 1, 0).applyQuaternion(camQ); }
 function lookQuat(o) {
   const p = posOf(o, tmp3);
   const d = new T.Vector3(p[0] - cam.p[0], p[1] - cam.p[1], p[2] - cam.p[2]);
   if (d.lengthSq() === 0) return camQ.clone();
   camAxes();
-  tm.lookAt(new T.Vector3(0, 0, 0), d.normalize(), vU);
+  tm.lookAt(ORIGIN, d.normalize(), vU);
   return new T.Quaternion().setFromRotationMatrix(tm);
 }
-function lookAtObj(o, k) { camQ.slerp(lookQuat(o), k); }
+function horizonQuat(b) {
+  const p = posOf(b, [0, 0, 0]);
+  const up = new T.Vector3(cam.p[0] - p[0], cam.p[1] - p[1], cam.p[2] - p[2]).normalize();
+  const sg = G(b.star), sun = new T.Vector3(sg[0] - cam.p[0], sg[1] - cam.p[1], sg[2] - cam.p[2]).normalize();
+  const f = sun.clone().sub(up.clone().multiplyScalar(sun.dot(up)));
+  if (f.lengthSq() < 1e-6) f.set(1, 0, 0).sub(up.clone().multiplyScalar(up.x));
+  f.normalize().addScaledVector(up, 0.08).normalize();
+  tm.lookAt(ORIGIN, f, up);
+  return new T.Quaternion().setFromRotationMatrix(tm);
+}
 
-function startGoto(o) {
+function startGoto(o, land) {
   if (!o) return;
+  if (land && !isRocky(o)) { toast(o.name + " has no solid surface"); return; }
   const p = posOf(o, [0, 0, 0]);
   const d0 = dist3(cam.p, p);
   const rad = radiusOf(o);
-  const arrive = o.kind === "galaxy" ? (o.home ? rad * 2.4 : rad * 1.7) : o.kind === "star" ? Math.max(rad * 8, 0.05 * AU / LY) : rad * 3.2;
+  let arrive = o.kind === "galaxy" ? (o.home ? rad * 2.4 : rad * 1.7) : o.kind === "nebula" ? rad * 2.4 : o.kind === "star" ? Math.max(rad * 8, (0.05 * AU) / LY) : rad * 3.2;
   const pullBack = o.kind === "galaxy" && d0 < arrive * 0.9;
-  if (d0 < arrive * 1.02 && !pullBack) { follow = o.kind === "body" ? o : null; setFollowOff(o); toast("Already at " + o.name); return; }
+  if (!land && d0 < arrive * 1.02 && !pullBack) { if (o.kind === "body") setFollowOff(o); toast("Already at " + o.name); return; }
   const dir = [(cam.p[0] - p[0]) / d0, (cam.p[1] - p[1]) / d0, (cam.p[2] - p[2]) / d0];
-  // approach from the lit side for planets and moons
   let dir1 = dir;
   if (pullBack) { const v = new T.Vector3(cam.p[0] - p[0], cam.p[1] - p[1], cam.p[2] - p[2]).multiplyScalar(0.35); v.y += o.radius * (cam.p[1] >= p[1] ? 1 : -1); v.normalize(); dir1 = [v.x, v.y, v.z]; }
-  if (o.kind === "body" && o.type !== "star") {
+  if (o.kind === "body" && o.type !== "star" && !(land && d0 * LY < o.r * 1.5)) {
     const L = new T.Vector3(-o.pos[0], -o.pos[1], -o.pos[2]).normalize();
-    const D = new T.Vector3(...dir).lerp(L, 0.6).normalize();
+    const D = new T.Vector3(...dir).lerp(L, land ? 0.45 : 0.6).normalize();
     dir1 = [D.x, D.y, D.z];
   }
-  const dur = clamp(2.2 + Math.log10(d0 / arrive) * 0.9, 2.2, 12);
-  goto = { o, d0, arrive, dir0: dir, dir1, t: 0, dur, q0: camQ.clone() };
-  follow = null;
-  toast("Going to " + o.name);
+  if (land) arrive = (o.r + Math.max(groundHeightDir(o, new T.Vector3(...dir1)), 0) + 0.0012) / LY;
+  const dur = clamp(2.2 + Math.log10(Math.max(d0 / arrive, 1)) * 0.9, land ? 4 : 2.2, 14);
+  goto = { o, d0, arrive, dir0: dir, dir1, t: 0, dur, land };
+  follow = null; orient = null;
+  toast((land ? "Landing on " : "Going to ") + o.name);
+  closeMenu();
 }
 function setFollowOff(o) {
-  if (o.kind !== "body") { follow = null; return; }
+  if (!o || o.kind !== "body") { follow = null; return; }
   const p = posOf(o, tmp3);
   followOff = [(cam.p[0] - p[0]) * LY, (cam.p[1] - p[1]) * LY, (cam.p[2] - p[2]) * LY];
+  bodyQuat(o, qPrev);
+  gv.set(followOff[0], followOff[1], followOff[2]).applyQuaternion(gq.copy(qPrev).invert());
+  followOffB = [gv.x, gv.y, gv.z];
   follow = o;
 }
 
 // ================= input =================
 const keys = new Set();
+const $ = (id) => document.getElementById(id);
+const qEl = $("q"), resultsEl = $("results"), helpEl = $("help"), barEl = $("bar");
 const isTyping = () => document.activeElement === qEl;
 addEventListener("keydown", (e) => {
   if (isTyping()) return;
@@ -1001,7 +1351,7 @@ addEventListener("keydown", (e) => {
   if (e.code === "Escape") { helpEl.hidden = true; return; }
   keys.add(e.code);
   switch (e.code) {
-    case "KeyG": startGoto(selected); break;
+    case "KeyG": startGoto(selected, e.shiftKey); break;
     case "KeyC": if (selected) centerOn(selected); break;
     case "KeyO": toggleOrbits(); break;
     case "KeyL": toggleLabels(); break;
@@ -1009,7 +1359,7 @@ addEventListener("keydown", (e) => {
     case "KeyH": goHome(false); break;
     case "Comma": setRate(rateI - 1); break;
     case "Period": setRate(rateI + 1); break;
-    case "Slash": setRate(0); paused = false; break;
+    case "Slash": setRate(0); break;
     case "KeyP": paused = !paused; updateClockBtns(); break;
     case "Equal": case "NumpadAdd": speedMul = clamp(speedMul * 1.6, 1e-3, 1e3); break;
     case "Minus": case "NumpadSubtract": speedMul = clamp(speedMul / 1.6, 1e-3, 1e3); break;
@@ -1018,17 +1368,19 @@ addEventListener("keydown", (e) => {
 });
 addEventListener("keyup", (e) => keys.delete(e.code));
 addEventListener("blur", () => keys.clear());
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+document.addEventListener("dblclick", (e) => e.preventDefault());
 glCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
 glCanvas.addEventListener("wheel", (e) => { e.preventDefault(); speedMul = clamp(speedMul * Math.exp(-e.deltaY * 0.0012), 1e-3, 1e3); }, { passive: false });
 
 const ptrs = new Map();
 let drag = null;
 glCanvas.addEventListener("pointerdown", (e) => {
-  glCanvas.setPointerCapture(e.pointerId);
+  try { glCanvas.setPointerCapture(e.pointerId); } catch (_) {}
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (ptrs.size === 1) drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, orbit: e.button === 2 || e.shiftKey, moved: 0 };
+  if (ptrs.size === 1) drag = { x: e.clientX, y: e.clientY, orbit: e.button === 2 || e.shiftKey, moved: 0 };
   else drag = null;
-  qEl.blur(); resultsEl.hidden = true;
+  qEl.blur(); resultsEl.hidden = true; closeMenu();
 });
 glCanvas.addEventListener("pointermove", (e) => {
   const prev = ptrs.get(e.pointerId); if (!prev) return;
@@ -1038,7 +1390,7 @@ glCanvas.addEventListener("pointermove", (e) => {
     prev.x = e.clientX; prev.y = e.clientY;
     const [c, d] = [...ptrs.values()];
     const d1 = Math.hypot(c.x - d.x, c.y - d.y);
-    if (d0 > 0) speedMul = clamp(speedMul * Math.pow(d1 / d0, 1.5), 1e-3, 1e3);
+    if (d0 > 0) speedMul = clamp(speedMul * Math.pow(d1 / d0, 1.6), 1e-3, 1e3);
     return;
   }
   prev.x = e.clientX; prev.y = e.clientY;
@@ -1046,7 +1398,8 @@ glCanvas.addEventListener("pointermove", (e) => {
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
   if (goto) return;
-  const k = (FOV * Math.PI) / 180 / H;
+  orient = null;
+  const k = ((FOV * Math.PI) / 180 / H) * (e.pointerType === "touch" ? 1.15 : 1);
   if (drag.orbit && selected) orbitAround(selected, -dx * k * 2.2, -dy * k * 2.2);
   else {
     tq.setFromAxisAngle(new T.Vector3(0, 1, 0), dx * k); camQ.multiply(tq);
@@ -1056,14 +1409,13 @@ glCanvas.addEventListener("pointermove", (e) => {
 });
 const endPtr = (e) => {
   ptrs.delete(e.pointerId);
-  if (drag && drag.moved < 6 && e.type === "pointerup") clickSelect(e.clientX, e.clientY);
+  if (drag && drag.moved < 8 && e.type === "pointerup") clickSelect(e.clientX, e.clientY, e.pointerType === "touch" ? 1.8 : 1);
   if (ptrs.size === 0) drag = null;
 };
 glCanvas.addEventListener("pointerup", endPtr);
 glCanvas.addEventListener("pointercancel", endPtr);
 
 function orbitAround(o, yaw, pitch) {
-  if (follow !== o) { if (o.kind === "body") setFollowOff(o); }
   const p = posOf(o, [0, 0, 0]);
   camAxes();
   const off = new T.Vector3(cam.p[0] - p[0], cam.p[1] - p[1], cam.p[2] - p[2]);
@@ -1071,38 +1423,59 @@ function orbitAround(o, yaw, pitch) {
   off.applyQuaternion(q);
   camQ.premultiply(q).normalize();
   cam.p[0] = p[0] + off.x; cam.p[1] = p[1] + off.y; cam.p[2] = p[2] + off.z;
-  if (follow === o) setFollowOff(o);
+  if (o.kind === "body") setFollowOff(o);
 }
-function centerOn(o) { goto = null; centerAnim = { q0: camQ.clone(), o, t: 0 }; }
-let centerAnim = null;
+function centerOn(o) { goto = null; orient = { q: lookQuat(o), o, t: 0 }; }
 
+// touch: joystick
+const joyEl = $("joy"), knob = joyEl.querySelector(".knob"), joyV = { x: 0, y: 0 };
+let joyId = null;
+function moveJoy(e) {
+  const r = joyEl.getBoundingClientRect();
+  let x = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), y = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+  const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; }
+  joyV.x = Math.abs(x) < 0.12 ? 0 : x; joyV.y = Math.abs(y) < 0.12 ? 0 : y;
+  knob.style.transform = `translate(${x * 36}px, ${y * 36}px)`;
+}
+joyEl.addEventListener("pointerdown", (e) => { e.preventDefault(); joyId = e.pointerId; try { joyEl.setPointerCapture(e.pointerId); } catch (_) {} moveJoy(e); });
+joyEl.addEventListener("pointermove", (e) => { if (e.pointerId === joyId) moveJoy(e); });
+const endJoy = (e) => { if (e.pointerId !== joyId) return; joyId = null; joyV.x = joyV.y = 0; knob.style.transform = ""; };
+joyEl.addEventListener("pointerup", endJoy); joyEl.addEventListener("pointercancel", endJoy); joyEl.addEventListener("lostpointercapture", endJoy);
 document.querySelectorAll("[data-hold]").forEach((b) => {
-  const code = b.dataset.hold === "fwd" ? "KeyW" : "KeyS";
+  const code = b.dataset.hold;
   const on = (e) => { e.preventDefault(); keys.add(code); b.classList.add("active"); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
   const off = () => { keys.delete(code); b.classList.remove("active"); };
   b.addEventListener("pointerdown", on); b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("lostpointercapture", off);
 });
-const $ = (id) => document.getElementById(id);
 $("tc-slow").onclick = () => (speedMul = clamp(speedMul / 2, 1e-3, 1e3));
 $("tc-fast").onclick = () => (speedMul = clamp(speedMul * 2, 1e-3, 1e3));
-$("t-goto").onclick = () => startGoto(selected);
-$("t-center").onclick = () => selected && centerOn(selected);
+
+// toolbar & menu
+$("t-goto").onclick = () => startGoto(selected, false);
+$("t-land").onclick = () => startGoto(selected, true);
+$("t-center").onclick = () => { if (selected) centerOn(selected); closeMenu(); };
 $("t-orbits").onclick = toggleOrbits; $("t-labels").onclick = toggleLabels; $("t-info").onclick = toggleInfo;
-$("t-home").onclick = () => goHome(false);
-const helpEl = $("help");
-$("t-help").onclick = () => (helpEl.hidden = !helpEl.hidden);
+$("t-home").onclick = () => { goHome(false); closeMenu(); };
+$("t-help").onclick = () => { helpEl.hidden = !helpEl.hidden; closeMenu(); };
 $("help-close").onclick = () => (helpEl.hidden = true);
 $("c-slow").onclick = () => setRate(rateI - 1);
 $("c-fast").onclick = () => setRate(rateI + 1);
 $("c-pause").onclick = () => { paused = !paused; updateClockBtns(); };
+$("t-menu").onclick = () => {
+  const open = !barEl.classList.contains("open");
+  barEl.classList.toggle("open", open); document.body.classList.toggle("menu-open", open);
+  $("t-menu").setAttribute("aria-expanded", String(open));
+  if (open) requestAnimationFrame(() => { $("clock").style.top = barEl.getBoundingClientRect().bottom + 6 + "px"; });
+};
+function closeMenu() { barEl.classList.remove("open"); document.body.classList.remove("menu-open"); $("t-menu").setAttribute("aria-expanded", "false"); }
 function toggleOrbits() { showOrbits = !showOrbits; $("t-orbits").classList.toggle("on", showOrbits); }
 function toggleLabels() { showLabels = !showLabels; $("t-labels").classList.toggle("on", showLabels); }
-function toggleInfo() { const el = $("info"); el.hidden = !el.hidden; $("t-info").classList.toggle("on", !el.hidden); }
+function toggleInfo() { const el = $("info"); el.hidden = !el.hidden; $("t-info").classList.toggle("on", !el.hidden); syncSheet(); }
 function setRate(i) { rateI = clamp(i, 0, RATES.length - 1); timeRate = RATES[rateI]; paused = false; updateClockBtns(); }
 function updateClockBtns() {
   $("c-pause").textContent = paused ? "▶" : "❚❚";
   const r = RATES[rateI];
-  const label = r === 1 ? "1× real time" : r < 3600 ? fmtN(r) + "× · " + fmtN(r / 60, r < 60 ? 2 : 0) + " min/s" : r < 86400 ? fmtN(r / 3600) + " h/s" : r < 604800 ? "1 day/s" : r < 2629800 ? "1 week/s" : r < 31557600 ? "1 month/s" : "1 year/s";
+  const label = r === 1 ? "1× real time" : r < 3600 ? fmtN(r) + "× real time" : r < 86400 ? "1 hour/s" : r < 604800 ? "1 day/s" : r < 2629800 ? "1 week/s" : r < 31557600 ? "1 month/s" : "1 year/s";
   $("c-rate").textContent = paused ? "Paused" : label;
 }
 
@@ -1110,34 +1483,35 @@ function updateClockBtns() {
 const sv = new T.Vector3();
 const qInv = new T.Quaternion();
 function project(p, out) {
-  // p: ly doubles; returns screen px, or null when behind the camera
   sv.set(p[0] - cam.p[0], p[1] - cam.p[1], p[2] - cam.p[2]).applyQuaternion(qInv);
   if (sv.z >= 0) return null;
-  const f = (H / 2) / Math.tan((FOV * Math.PI) / 360);
+  const f = H / 2 / Math.tan((FOV * Math.PI) / 360);
   out.x = W / 2 + (sv.x / -sv.z) * f; out.y = H / 2 - (sv.y / -sv.z) * f; out.d = -sv.z; out.f = f;
   return out;
 }
 function screenR(o, pr) { return (radiusOf(o) / pr.d) * pr.f; }
-function clickSelect(x, y) {
+function clickSelect(x, y, slop) {
   qInv.copy(camQ).invert();
   let best = null, bd = 1e9; const pr = {};
   const consider = (o, minR) => {
     if (!project(posOf(o, tmp3), pr)) return;
     const d = Math.hypot(pr.x - x, pr.y - y), sr = o.kind === "galaxy" ? 0 : screenR(o, pr);
-    const lim = Math.max(minR, sr * 1.1);
+    const lim = Math.max(minR * slop, sr * 1.1);
     if (d < lim && d - sr * 0.5 < bd) { bd = d - sr * 0.5; best = o; }
   };
   if (sys) for (const b of sys.bodies) consider(b, 14);
   for (const s of localStars) if (!sys || s !== sys.star) consider(s, 9);
+  for (const n of NEBULAE) consider(n, 16);
   for (const g of GALAXIES) consider(g, 18);
+  if (!best && ground) return; // tapping the ground keeps the current selection
   selected = best;
   renderInfo();
 }
 
 // ---------- search ----------
-const qEl = $("q"), resultsEl = $("results");
 let results = [], resI = 0;
 qEl.addEventListener("input", runSearch);
+qEl.addEventListener("focus", () => { closeMenu(); runSearch(); });
 qEl.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown") { resI = Math.min(resI + 1, results.length - 1); paintResults(); e.preventDefault(); }
   else if (e.key === "ArrowUp") { resI = Math.max(resI - 1, 0); paintResults(); e.preventDefault(); }
@@ -1150,10 +1524,11 @@ function runSearch() {
   if (q) {
     const add = (o, where) => { if (o.name.toLowerCase().includes(q) || (o.catalog && o.catalog.toLowerCase().includes(q))) results.push({ o, where }); };
     if (sys) for (const b of sys.bodies) add(b, b.type === "star" ? "This system" : b.cls);
+    for (const n of NEBULAE) add(n, n.type + " · " + fmtDist(dG(n)));
     for (const g of GALAXIES) add(g, g.type);
-    const near = localStars.filter((s) => !sys || s !== sys.star).map((s) => ({ s, d: dist3(s.g, cam.p) })).sort((a, b) => a.d - b.d);
+    const near = localStars.filter((s) => !sys || s !== sys.star).map((s) => ({ s, d: dG(s) })).sort((a, b) => a.d - b.d);
     for (const { s, d } of near) { if (results.length > 40) break; add(s, starClassCode(s) + " · " + fmtDist(d)); }
-    if ("halcyon".includes(q) || q === "home") { if (homeStar && !results.some((r) => r.o === homeStar)) results.unshift({ o: homeStar, where: "Home star" }); }
+    if (("halcyon".includes(q) || q === "home") && homeStar && !results.some((r) => r.o === homeStar)) results.unshift({ o: homeStar, where: "Home star" });
   }
   results = results.slice(0, 10); resI = 0;
   paintResults();
@@ -1170,7 +1545,7 @@ function paintResults() {
     resultsEl.appendChild(li);
   });
 }
-function chooseResult(r) { selected = r.o; renderInfo(); startGoto(r.o); qEl.value = ""; resultsEl.hidden = true; qEl.blur(); }
+function chooseResult(r) { selected = r.o; renderInfo(); startGoto(r.o, false); qEl.value = ""; resultsEl.hidden = true; qEl.blur(); }
 
 // ---------- info panel ----------
 function starClassCode(s) {
@@ -1184,17 +1559,25 @@ function starTypeName(s) {
   if (s.giant) return (s.cls === "M" ? "Red" : s.cls === "K" ? "Orange" : "Yellow") + " giant";
   return map[s.cls];
 }
+const infoEl = $("info");
+let infoExpanded = !MOBILE;
 function renderInfo() {
-  const el = $("info");
-  const o = selected;
-  if (!o) { el.innerHTML = `<h2>Nothing selected</h2><p class="empty">Click a star, planet, moon or galaxy. Press G to fly there.</p>`; return; }
+  const el = infoEl, o = selected;
+  el.innerHTML = "";
+  if (!o) {
+    el.innerHTML = `<div class="head"><h2>Nothing selected</h2></div><p class="empty">Tap or click a star, planet, moon, nebula or galaxy.</p>`;
+    $("t-land").disabled = true; $("t-goto").disabled = true; syncSheet(); return;
+  }
   const rows = [];
   let title = o.name, cls = "", where = "";
   if (o.kind === "galaxy") {
     cls = o.type; where = o.home ? "Home galaxy" : "Extragalactic";
-    rows.push(["Diameter", fmtN(o.radius * 2) + " ly"], ["Stars", o.stars], ["Distance", fmtDist(dist3(cam.p, o.g))]);
-    if (o.home) rows.push(["Galactic centre", fmtDist(Math.hypot(cam.p[0], cam.p[1], cam.p[2]))]);
-  } else if (o.kind === "star" || (o.kind === "body" && o.type === "star")) {
+    rows.push(["Diameter", fmtN(o.radius * 2) + " ly"], ["Stars", o.stars], ["Distance", fmtDist(dG(o))]);
+    if (o.home) rows.push(["You are", fmtN(Math.hypot(...AC())) + " ly from the centre"]);
+  } else if (o.kind === "nebula") {
+    cls = o.type; where = "Aurelis Galaxy";
+    rows.push(["Diameter", fmtSig(o.radius * 2) + " ly"], ["Composition", o.type === "Reflection nebula" ? "Dust lit by nearby stars" : o.type === "Planetary nebula" ? "Ionised shell around a white dwarf" : o.type === "Supernova remnant" ? "Shocked gas, O III and Hα" : "Ionised hydrogen (Hα) and O III"], ["Distance", fmtDist(dG(o))]);
+  } else if (o.kind === "star" || o.type === "star") {
     const s = o.kind === "star" ? o : o.star;
     title = s.name; cls = starClassCode(s) + " · " + starTypeName(s);
     where = s.catalog !== s.name ? s.catalog : "";
@@ -1203,7 +1586,7 @@ function renderInfo() {
     if (s.cls === "N") rows.push(["Spin period", fmtN(0.03 + (s.seed % 100) / 50, 3) + " s"]);
     const sysB = sys && sys.star === s ? sys.bodies : null;
     rows.push(["Planets", sysB ? String(sysB.filter((b) => b.type === "planet").length) : "Approach to survey"]);
-    rows.push(["Distance", fmtDist(dist3(cam.p, s.g))]);
+    rows.push(["Distance", fmtDist(dG(s))]);
     rows.push(["Galactic radius", fmtN(Math.hypot(s.g[0], s.g[2])) + " ly"]);
   } else {
     cls = o.cls; where = (o.type === "moon" ? "Moon of " : "Orbits ") + o.parent.name;
@@ -1213,13 +1596,15 @@ function renderInfo() {
     rows.push(["Life", o.life]);
     rows.push(["Semimajor axis", o.type === "moon" ? fmtN(o.a * 1000) + " km" : fmtSig(o.aAU) + " AU"]);
     rows.push(["Orbital period", fmtDur(o.period)], ["Day length", fmtDur(Math.abs(TAU / o.spin))], ["Axial tilt", fmtN((o.tilt * 180) / Math.PI, 1) + "°"]);
-    const moons = o.sys ? o.sys.bodies.filter((b) => b.parent === o).length : 0;
-    if (o.type === "planet") rows.push(["Moons", String(moons)]);
+    if (o.type === "planet") rows.push(["Moons", String(o.sys ? o.sys.bodies.filter((b) => b.parent === o).length : 0)]);
     if (o.rings) rows.push(["Rings", "Yes"]);
-    rows.push(["Distance", fmtDist(dist3(cam.p, posOf(o, tmp3)) - radiusOf(o))]);
+    rows.push(["Distance", fmtDist(Math.max(dist3(cam.p, posOf(o, tmp3)) - radiusOf(o), 0))]);
   }
-  el.innerHTML = "";
-  const h = document.createElement("h2"); h.textContent = title; el.appendChild(h);
+  const head = document.createElement("div"); head.className = "head";
+  const h = document.createElement("h2"); h.textContent = title; head.appendChild(h);
+  const more = document.createElement("button"); more.type = "button"; more.className = "t more"; more.textContent = infoExpanded ? "Less" : "Details";
+  more.onclick = () => { infoExpanded = !infoExpanded; el.classList.toggle("expanded", infoExpanded); more.textContent = infoExpanded ? "Less" : "Details"; syncSheet(); };
+  head.appendChild(more); el.appendChild(head);
   const c = document.createElement("div"); c.className = "cls"; c.textContent = cls; el.appendChild(c);
   if (where) { const w = document.createElement("div"); w.className = "where"; w.textContent = where; el.appendChild(w); }
   const dl = document.createElement("dl");
@@ -1229,12 +1614,22 @@ function renderInfo() {
     div.append(dt, dd); dl.appendChild(div);
   }
   el.appendChild(dl);
+  el.classList.toggle("expanded", infoExpanded);
   const act = document.createElement("div"); act.className = "actions";
-  const b1 = document.createElement("button"); b1.className = "t go"; b1.type = "button"; b1.textContent = "Go to"; b1.onclick = () => startGoto(o);
-  const b2 = document.createElement("button"); b2.className = "t"; b2.type = "button"; b2.textContent = "Center"; b2.onclick = () => centerOn(o);
-  act.append(b1, b2); el.appendChild(act);
-  el.classList.toggle("has-touch", matchMedia("(pointer: coarse)").matches);
+  const mk = (label, cls2, fn) => { const b = document.createElement("button"); b.className = "t " + cls2; b.type = "button"; b.textContent = label; b.onclick = fn; act.appendChild(b); return b; };
+  mk("Go to", "go", () => startGoto(o, false));
+  if (isRocky(o)) mk("Land", "go", () => startGoto(o, true));
+  mk("Center", "", () => centerOn(o));
+  el.appendChild(act);
+  $("t-land").disabled = !isRocky(o); $("t-goto").disabled = false;
+  syncSheet();
 }
+function syncSheet() {
+  const phone = matchMedia("(pointer: coarse), (max-width: 720px)").matches;
+  const h = phone && !infoEl.hidden ? infoEl.offsetHeight + 8 : 0;
+  document.documentElement.style.setProperty("--sheet-h", h + "px");
+}
+addEventListener("resize", syncSheet);
 
 // ---------- toast ----------
 const toastEl = $("toast"); let toastT = 0;
@@ -1243,25 +1638,39 @@ function toast(m) { toastEl.textContent = m; toastEl.classList.add("show"); clea
 // ================= frame update =================
 function nearestInfo() {
   let best = null, bd = Infinity;
-  if (sys) for (const b of sys.bodies) { const d = dist3(cam.p, posOf(b, tmp3)) - b.r / LY; if (d < bd) { bd = d; best = b; } }
-  for (const s of localStars) { if (sys && s === sys.star) continue; const d = dist3(cam.p, s.g) - s.Rm / LY; if (d < bd) { bd = d; best = s; } }
-  const dc = Math.hypot(cam.p[0], cam.p[1] * 4, cam.p[2]) - GAL_R;
+  if (sys) for (const b of sys.bodies) {
+    let d = dist3(cam.p, posOf(b, tmp3)) - b.r / LY;
+    if (ground && ground.b === b) d = ground.alt / LY;
+    if (d < bd) { bd = d; best = b; }
+  }
+  for (const s of localStars) { if (sys && s === sys.star) continue; const d = dG(s) - s.Rm / LY; if (d < bd) { bd = d; best = s; } }
+  const ac = AC(), dc = Math.hypot(ac[0], ac[1] * 4, ac[2]) - GAL_R;
   if (dc > 0 && dc * 0.6 < bd) { bd = dc * 0.6; best = HOME; }
-  for (let i = 1; i < GALAXIES.length; i++) { const g = GALAXIES[i], d = dist3(cam.p, g.g) - g.radius; if (d < bd) { bd = Math.max(d, g.radius * 0.05); best = g; } }
-  return { o: best, d: Math.max(bd, 1e-12) };
+  for (let i = 1; i < GALAXIES.length; i++) { const g = GALAXIES[i], d = dG(g) - g.radius; if (d < bd) { bd = Math.max(d, g.radius * 0.05); best = g; } }
+  return { o: best, d: Math.max(bd, 1e-13) };
 }
-
 let near = { o: null, d: 1 };
 let curSpeed = 0;
 function manageSystem() {
-  // load the system of the closest star within 0.1 ly, unload past 0.15 ly
-  if (sys) {
-    if (dist3(cam.p, sys.star.g) > 0.15) { unloadSystem(); }
-    else return;
-  }
+  if (sys) { if (dG(sys.star) > 0.15) unloadSystem(); else return; }
   let best = null, bd = 0.1;
-  for (const s of localStars) { const d = dist3(cam.p, s.g); if (d < bd) { bd = d; best = s; } }
-  if (best) { loadSystem(best); updateBodies(); toast("Entering the " + best.name + " system"); }
+  for (const s of localStars) { const d = dG(s); if (d < bd) { bd = d; best = s; } }
+  if (best) { rebase(best.g); loadSystem(best); updateBodies(); toast("Entering the " + best.name + " system"); }
+}
+function updateGround() {
+  ground = null;
+  if (!sys) return;
+  let best = null, bd = Infinity;
+  for (const b of sys.bodies) {
+    if (!isRocky(b)) continue;
+    const d = dist3(cam.p, posOf(b, tmp3)) * LY - b.r;
+    if (d < b.r * 0.6 && d < bd) { bd = d; best = b; }
+  }
+  if (!best) return;
+  const p = posOf(best, [0, 0, 0]);
+  const D = new T.Vector3(cam.p[0] - p[0], cam.p[1] - p[1], cam.p[2] - p[2]);
+  const h = groundHeightDir(best, D);
+  ground = { b: best, h, alt: D.length() * LY - best.r - h, up: D.normalize() };
 }
 
 function step(dt) {
@@ -1277,22 +1686,31 @@ function step(dt) {
     const dnow = g.d0 * Math.pow(g.arrive / g.d0, e);
     const D = new T.Vector3(...g.dir0).lerp(new T.Vector3(...g.dir1), e).normalize();
     cam.p[0] = tp[0] + D.x * dnow; cam.p[1] = tp[1] + D.y * dnow; cam.p[2] = tp[2] + D.z * dnow;
-    const want = lookQuat(g.o);
-    camQ.slerp(want, clamp(dt * (u < 0.2 ? 4 : 8), 0, 1));
-    if (u >= 1) { goto = null; setFollowOff(g.o); toast("Arrived · " + g.o.name); }
+    if (!(g.land && u > 0.8)) camQ.slerp(lookQuat(g.o), clamp(dt * (u < 0.2 ? 4 : 8), 0, 1));
+    else camQ.slerp(horizonQuat(g.o), clamp(dt * 3, 0, 1));
+    if (u >= 1) { goto = null; setFollowOff(g.o); toast(g.land ? "Landed on " + g.o.name : "Arrived · " + g.o.name); if (g.land) orient = { q: horizonQuat(g.o), t: 0 }; }
     curSpeed = 0;
   } else {
-    if (centerAnim) {
-      centerAnim.t += dt;
-      camQ.slerp(lookQuat(centerAnim.o), clamp(dt * 6, 0, 1));
-      if (centerAnim.t > 1.2) centerAnim = null;
+    if (orient) {
+      orient.t += dt;
+      camQ.slerp(orient.o ? lookQuat(orient.o) : orient.q, clamp(dt * 5, 0, 1));
+      if (orient.t > 1.4) orient = null;
     }
-    // follow moving body
-    if (follow) { const fp = posOf(follow, tmp3); cam.p[0] = fp[0] + followOff[0] / LY; cam.p[1] = fp[1] + followOff[1] / LY; cam.p[2] = fp[2] + followOff[2] / LY; }
-    // roll
+    // follow the selected body; close to the surface, turn with it
+    if (follow) {
+      const fp = posOf(follow, tmp3);
+      let ox = followOff[0], oy = followOff[1], oz = followOff[2];
+      if (follow.type !== "star" && Math.hypot(ox, oy, oz) - follow.r < follow.r * 0.6) {
+        bodyQuat(follow, qNow);
+        gv.set(followOffB[0], followOffB[1], followOffB[2]).applyQuaternion(qNow);
+        ox = gv.x; oy = gv.y; oz = gv.z;
+        tq.copy(qNow).multiply(gq.copy(qPrev).invert());
+        camQ.premultiply(tq).normalize();
+      }
+      cam.p[0] = fp[0] + ox / LY; cam.p[1] = fp[1] + oy / LY; cam.p[2] = fp[2] + oz / LY;
+    }
     const roll = (keys.has("KeyQ") ? 1 : 0) - (keys.has("KeyE") ? 1 : 0);
     if (roll) { tq.setFromAxisAngle(new T.Vector3(0, 0, 1), roll * 1.2 * dt); camQ.multiply(tq).normalize(); }
-    // translate
     camAxes();
     const mv = new T.Vector3();
     if (keys.has("KeyW") || keys.has("ArrowUp")) mv.add(vF);
@@ -1301,85 +1719,150 @@ function step(dt) {
     if (keys.has("KeyA") || keys.has("ArrowLeft")) mv.sub(vR);
     if (keys.has("KeyR") || keys.has("PageUp")) mv.add(vU);
     if (keys.has("KeyF") || keys.has("PageDown")) mv.sub(vU);
+    mv.addScaledVector(vF, -joyV.y).addScaledVector(vR, joyV.x);
     const boost = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 5 : 1;
     const sp = speedMul * near.d * 0.9 * boost;
-    curSpeed = mv.lengthSq() ? sp : 0;
-    if (mv.lengthSq()) {
-      mv.normalize().multiplyScalar(sp * dt);
+    const mag = Math.min(mv.length(), 1);
+    curSpeed = mag > 0 ? sp * mag : 0;
+    if (mag > 0) {
+      mv.normalize().multiplyScalar(sp * mag * dt);
       cam.p[0] += mv.x; cam.p[1] += mv.y; cam.p[2] += mv.z;
-      centerAnim = null;
+      orient = null;
     }
-    // keep above surfaces
+    // keep the horizon level near the ground
+    updateGround();
+    if (ground && ground.alt < ground.b.r * 0.25 && !roll && !orient) {
+      camAxes();
+      if (Math.abs(vF.dot(ground.up)) < 0.96) {
+        tm.lookAt(ORIGIN, vF, ground.up);
+        tq.setFromRotationMatrix(tm);
+        camQ.slerp(tq, clamp(dt * 1.6, 0, 1));
+      }
+    }
+    // stay above surfaces and terrain
     if (sys) for (const b of sys.bodies) {
-      const bp = posOf(b, [0, 0, 0]), d = dist3(cam.p, bp), min = (b.r * 1.0015 + 0.0005) / LY;
+      const bp = posOf(b, [0, 0, 0]), d = dist3(cam.p, bp);
+      const min = (b.r + (ground && ground.b === b ? ground.h : 0) + 1.8e-6) / LY;
       if (d < min) { const k = min / d; cam.p[0] = bp[0] + (cam.p[0] - bp[0]) * k; cam.p[1] = bp[1] + (cam.p[1] - bp[1]) * k; cam.p[2] = bp[2] + (cam.p[2] - bp[2]) * k; }
     }
     if (follow) setFollowOff(follow);
   }
-
+  updateGround();
   rebuildStars(false);
   manageSystem();
   near = nearestInfo();
 }
 
 // ================= rendering =================
-const sunView = new T.Vector3();
-let texBudget = 0;
-function render(now) {
+let dayBlock = 0;
+const sunView = new T.Vector3(), vA = new T.Vector3(), vB = new T.Vector3();
+function render() {
   galCam.quaternion.copy(camQ); sysCam.quaternion.copy(camQ);
   galCam.updateMatrixWorld(); sysCam.updateMatrixWorld();
   qInv.copy(camQ).invert();
 
-  // galaxy layer: shift everything by -camera (floating origin)
-  galGroup.position.set(-cam.p[0], -cam.p[1], -cam.p[2]);
-  if (starPoints) starPoints.position.set(starOrigin[0] - cam.p[0], starOrigin[1] - cam.p[1], starOrigin[2] - cam.p[2]);
-  for (let i = 1; i < GALAXIES.length; i++) { const g = GALAXIES[i]; g.mesh.position.set(g.g[0] - cam.p[0], g.g[1] - cam.p[1], g.g[2] - cam.p[2]); }
-  const R = Math.hypot(cam.p[0], cam.p[2]), ay = Math.abs(cam.p[1]);
+  const ac = AC();
+  galGroup.position.set(-ac[0], -ac[1], -ac[2]);
+  if (starPoints) starPoints.position.set(starOrigin[0] - ac[0], starOrigin[1] - ac[1], starOrigin[2] - ac[2]);
+  for (let i = 1; i < GALAXIES.length; i++) { const g = GALAXIES[i]; g.mesh.position.set(g.g[0] - ac[0], g.g[1] - ac[1], g.g[2] - ac[2]); }
+  for (const n of NEBULAE) {
+    const d = dG(n), f = smooth(n.radius * 0.15, n.radius * 0.9, d) * (1 - smooth(4000, 9000, d) * 0.7);
+    for (const s of n.sprites) s.material.opacity = s.userData.base * f;
+  }
+  const R = Math.hypot(ac[0], ac[2]), ay = Math.abs(ac[1]);
   const inside = (1 - smooth(1200, 7000, ay)) * (1 - smooth(GAL_R * 0.85, GAL_R * 1.15, R));
-  skyMat.uniforms.uCam.value.set(cam.p[0], cam.p[1], cam.p[2]);
+  skyMat.uniforms.uCam.value.set(ac[0], ac[1], ac[2]);
   skyMat.uniforms.uStrength.value = inside * 0.42;
   homeDisk.material.opacity = 1 - inside * 0.97;
-  // inside a star system the bright star washes out faint stars
-  let glareDim = 1;
-  if (sys && sys.star.cls !== "X" && sys.star.cls !== "N") {
-    const sd = dist3(cam.p, sys.star.g) * LY / AU;
-    glareDim = clamp(0.35 + 0.65 * smooth(0.5, 60, sd), 0.35, 1);
-  }
-  for (const m of pointMats) m.uniforms.uFade.value = glareDim;
 
-  // system layer: positions relative to camera in Mm
+  let starDim = 1;
+  if (sys && sys.star.cls !== "X" && sys.star.cls !== "N") starDim = clamp(0.35 + 0.65 * smooth(0.5, 60, (dG(sys.star) * LY) / AU), 0.35, 1);
+
+  // atmosphere around the camera
+  dayBlock = 0;
+  skyDome.visible = false; sysScene.fog.near = 1e12; sysScene.fog.far = 1e13;
+  if (sys && ground && ground.b.atmoH && ground.alt < ground.b.atmoH * 1.5) {
+    const b = ground.b, alt = Math.max(ground.alt, 0);
+    const up = ground.up;
+    const sp = G(sys.star);
+    const sun = vA.set(sp[0] - cam.p[0], sp[1] - cam.p[1], sp[2] - cam.p[2]).normalize();
+    const dens = b.skyDens * (1 - smooth(0, b.atmoH * 1.5, alt));
+    const sm = sun.dot(up), day = smooth(-0.2, 0.1, sm);
+    skyDomeMat.uniforms.uSun.value.copy(sun);
+    skyDomeMat.uniforms.uUp.value.copy(up);
+    skyDomeMat.uniforms.uCol.value.set(...b.skyCol);
+    skyDomeMat.uniforms.uDens.value = dens;
+    skyDome.scale.setScalar(0.4 + 3 * Math.sqrt(2 * b.r * Math.max(alt, 1e-6)));
+    skyDome.visible = dens > 0.002;
+    const dusk = 1 - smooth(0, 0.32, Math.abs(sm + 0.03));
+    const hc = [lerp(b.skyCol[0], 1, 0.6), lerp(b.skyCol[1], 1, 0.6), lerp(b.skyCol[2], 1, 0.6)];
+    const k = Math.max(day, dusk * 0.5) * 0.9 + 0.02;
+    sysScene.fog.color.setRGB(lerp(hc[0], 1, dusk * 0.3) * k, lerp(hc[1], 0.5, dusk * 0.3) * k, lerp(hc[2], 0.3, dusk * 0.3) * k);
+    sysScene.fog.near = 0;
+    sysScene.fog.far = (0.12 + alt * 4) / Math.max(dens, 0.05);
+    dayBlock = dens * day;
+  }
+  for (const m of pointMats) m.uniforms.uFade.value = starDim * (1 - dayBlock * 0.97);
+
+  for (const m of terrainGroup.children) m.visible = false;
   if (sys) {
-    const sp = sys.star.g;
+    const sp = G(sys.star);
     const cx = (cam.p[0] - sp[0]) * LY, cy = (cam.p[1] - sp[1]) * LY, cz = (cam.p[2] - sp[2]) * LY;
     sys.light.position.set(-cx, -cy, -cz);
-    texBudget = 1;
-    const pr = {};
+    let texBudget = 1;
     for (const b of sys.bodies) {
       b.root.position.set(b.pos[0] - cx, b.pos[1] - cy, b.pos[2] - cz);
-      const dcam = b.root.position.length();
+      const dcam = Math.hypot(b.pos[0] - cx, b.pos[1] - cy, b.pos[2] - cz);
       if (b.type === "star") {
-        b.root.rotation.y = simT * b.spin;
+        b.root.rotation.y = (simT * b.spin) % TAU;
         const ang = b.r / Math.max(dcam, 1e-9);
+        // hide the glare when a planet blocks the star
+        vA.set(-cx, -cy, -cz); const ds = vA.length(); vA.divideScalar(ds);
+        let blocked = false;
+        for (const o of sys.bodies) {
+          if (o === b) continue;
+          vB.set(o.pos[0] - cx, o.pos[1] - cy, o.pos[2] - cz);
+          const tt = vB.dot(vA);
+          if (tt > 0 && tt < ds && vB.addScaledVector(vA, -tt).length() < o.r + (ground && ground.b === o ? ground.h : 0)) { blocked = true; break; }
+        }
+        b.glare.visible = !blocked;
         b.glare.material.opacity = clamp(1 - ang * 6, 0, 1) * (sys.star.cls === "X" ? 0.5 : 1);
-        b.glare.scale.setScalar(clamp(0.05 + Math.log10(1 + Math.max(sys.star.L, 0.01) * 2e4 / Math.pow(dcam / AU + 0.01, 2)) * 0.02, 0.03, 0.22));
+        b.glare.scale.setScalar(clamp(0.05 + Math.log10(1 + (Math.max(sys.star.L, 0.01) * 2e4) / Math.pow(dcam / AU + 0.01, 2)) * 0.02, 0.03, 0.24) * (MOBILE ? 1.3 : 1));
         if (b.disk) b.disk.rotation.z = simT * 0.4;
+        if (b.photonRing) b.photonRing.quaternion.copy(camQ);
         if (b.beams) b.beams.rotation.y = (performance.now() / 1000) * 4;
       } else {
-        b.surf.rotation.y = simT * b.spin;
-        if (b.clouds) b.clouds.rotation.y = simT * b.spin * 1.08;
-        if (b.atmoMesh) {
-          sunView.set(-b.pos[0], -b.pos[1], -b.pos[2]).normalize().applyQuaternion(qInv);
-          b.atmoMesh.material.uniforms.uSun.value.copy(sunView);
-        }
+        const spin = (simT * b.spin) % TAU;
+        b.surf.rotation.y = spin;
+        if (b.clouds) b.clouds.rotation.y = spin * 1.0 + simT * 2e-6;
+        if (b.atmoMesh) { sunView.set(-b.pos[0], -b.pos[1], -b.pos[2]).normalize(); b.atmoMesh.material.uniforms.uSun.value.copy(sunView.applyQuaternion(qInv)); }
         b.orbit.visible = showOrbits;
         const pp = b.parent.pos;
         b.orbit.position.set(pp[0] - cx, pp[1] - cy, pp[2] - cz);
+        b.orbit.material.opacity = (b.type === "moon" ? 0.28 : 0.4) * smooth(b.r * 2, b.r * 30, dcam) * (1 - dayBlock * 0.85);
         if (!b.texReady && texBudget > 0) {
-          const pxR = (b.r / Math.max(dcam - b.r, 1e-6)) * (H / 2) / Math.tan((FOV * Math.PI) / 360);
+          const pxR = ((b.r / Math.max(dcam - b.r, 1e-6)) * (H / 2)) / Math.tan((FOV * Math.PI) / 360);
           if (pxR > 2.5) { texturize(b); texBudget--; }
         }
-        // fade orbit line when very close to the planet so it does not cut through it
-        b.orbit.material.opacity = (b.type === "moon" ? 0.28 : 0.4) * smooth(b.r * 2, b.r * 30, dcam);
+        // terrain streaming
+        const alt = dcam - b.r;
+        if (isRocky(b)) {
+          if (!b.terrain && alt < b.r * 0.5) b.terrain = makeTerrain(b);
+          if (b.terrain && alt > b.r * 0.9) { disposeTerrain(b.terrain); b.terrain = null; b.surf.visible = true; }
+        }
+        if (b.terrain) {
+          bodyQuat(b, qNow);
+          gq.copy(qNow).invert();
+          gv.set(cx - b.pos[0], cy - b.pos[1], cz - b.pos[2]).applyQuaternion(gq);
+          const camB = [gv.x, gv.y, gv.z];
+          const draw = terrainSelect(b.terrain, camB);
+          const ready = b.terrain.roots.every((r) => r.mesh);
+          b.surf.visible = !ready;
+          if (ready) for (const n of draw) {
+            gv.set(n.cc[0] - camB[0], n.cc[1] - camB[1], n.cc[2] - camB[2]).applyQuaternion(qNow);
+            n.mesh.position.copy(gv); n.mesh.quaternion.copy(qNow); n.mesh.visible = true;
+          }
+        }
       }
     }
   }
@@ -1401,41 +1884,67 @@ function drawOverlay() {
   const labels = [];
   const occ = [];
   if (sys) for (const b of sys.bodies) { const q = {}; if (project(posOf(b, tmp3), q)) { const sr = screenR(b, q); if (sr > 6) occ.push({ x: q.x, y: q.y, r: sr, d: q.d, b }); } }
-  const hidden = (x, y, d, self) => occ.some((o) => o.b !== self && d > o.d && Math.hypot(x - o.x, y - o.y) < o.r);
+  const hidden = (x, y, d, self) => occ.some((o) => o.b !== self && d > o.d && Math.hypot(x - o.x, y - o.y) < o.r) || (ground && d * LY > Math.sqrt(2 * ground.b.r * Math.max(ground.alt, 1e-6)) * 1.05 && isBelowHorizon());
+  let belowCache = null;
+  function isBelowHorizon() { return belowCache; }
+  const groundUp = ground ? ground.up : null;
+  const horizonTest = (p) => {
+    if (!groundUp) return false;
+    sv.set(p[0] - cam.p[0], p[1] - cam.p[1], p[2] - cam.p[2]).normalize();
+    const dip = Math.sqrt(2 * Math.max(ground.alt, 1e-7) / ground.b.r);
+    return sv.dot(groundUp) < -dip;
+  };
   if (showLabels) {
     if (sys) {
       for (const b of sys.bodies) {
-        if (!project(posOf(b, tmp3), pr)) continue;
+        if (ground && b === ground.b) continue;
+        const p = posOf(b, [0, 0, 0]);
+        if (!project(p, pr)) continue;
+        belowCache = horizonTest(p);
         const sr = screenR(b, pr);
-        if (b.type === "moon") {
-          const pp = {}; project(posOf(b.parent, [0, 0, 0]), pp);
-          if (pp.x !== undefined && Math.hypot(pp.x - pr.x, pp.y - pr.y) < 26 && b !== selected) continue;
-        }
         if (hidden(pr.x, pr.y, pr.d, b)) continue;
+        if (b.type === "moon") {
+          const pp = {};
+          if (project(posOf(b.parent, [0, 0, 0]), pp) && Math.hypot(pp.x - pr.x, pp.y - pr.y) < 26 && b !== selected) continue;
+        }
         labels.push({ x: pr.x, y: pr.y, sr, name: b.name, col: b.type === "star" ? "rgba(255,214,150,0.95)" : b.type === "moon" ? "rgba(160,180,205,0.85)" : "rgba(170,215,255,0.95)", marker: sr < 4 });
       }
     }
-    // stars: label the brightest few on screen
     const cand = [];
-    for (const s of localStars) {
+    if (dayBlock < 0.45) for (const s of localStars) {
       if (sys && s === sys.star) continue;
-      const d = dist3(cam.p, s.g); if (d > 40) continue;
+      const d = dG(s); if (d > 40) continue;
       const b = Math.max(s.L, 0.004) / (d * d);
       if (b < 2e-4 && d > 6) continue;
       cand.push({ s, b });
     }
     cand.sort((a, b) => b.b - a.b);
     let shown = 0;
+    const maxStars = W < 500 ? 7 : 14;
     for (const { s } of cand) {
-      if (shown >= 14) break;
-      if (!project(s.g, pr)) continue;
+      if (shown >= maxStars) break;
+      const sg = G(s);
+      if (!project(sg, pr)) continue;
+      belowCache = horizonTest(sg);
       if (pr.x < 0 || pr.x > W || pr.y < 0 || pr.y > H || hidden(pr.x, pr.y, pr.d, null)) continue;
       labels.push({ x: pr.x, y: pr.y, sr: 0, name: s.name, col: "rgba(200,205,220,0.6)", small: true });
       shown++;
     }
-    for (const gx of GALAXIES) {
-      if (gx.home && Math.hypot(cam.p[0], cam.p[2]) < GAL_R * 1.1 && Math.abs(cam.p[1]) < 6000) continue;
-      if (!project(gx.g, pr) || hidden(pr.x, pr.y, pr.d, null)) continue;
+    if (dayBlock < 0.45) for (const n of NEBULAE) {
+      const d = dG(n); if (d > 4000 || d < n.radius * 0.5) continue;
+      const ng = G(n);
+      if (!project(ng, pr)) continue;
+      belowCache = horizonTest(ng);
+      if (hidden(pr.x, pr.y, pr.d, null)) continue;
+      labels.push({ x: pr.x, y: pr.y, sr: 0, name: n.name, col: "rgba(255,170,190,0.75)" });
+    }
+    if (dayBlock < 0.45) for (const gx of GALAXIES) {
+      const ac = AC();
+      if (gx.home && Math.hypot(ac[0], ac[2]) < GAL_R * 1.1 && Math.abs(ac[1]) < 6000) continue;
+      const gg = G(gx);
+      if (!project(gg, pr)) continue;
+      belowCache = horizonTest(gg);
+      if (hidden(pr.x, pr.y, pr.d, null)) continue;
       labels.push({ x: pr.x, y: pr.y, sr: 0, name: gx.name, col: "rgba(220,200,255,0.75)" });
     }
   }
@@ -1446,52 +1955,58 @@ function drawOverlay() {
     if (L.marker) { g.lineWidth = 1; g.beginPath(); g.arc(L.x, L.y, 3.5, 0, TAU); g.stroke(); }
     g.fillText(L.name, L.x + Math.max(L.sr, 4) + 6, L.y);
   }
-  // selection marker
-  if (selected) {
+  if (selected && !(ground && selected === ground.b && ground.alt < ground.b.r * 0.05)) {
     const p = posOf(selected, [0, 0, 0]);
     const ok = project(p, pr);
     g.strokeStyle = "rgba(111,208,255,0.95)"; g.fillStyle = "rgba(111,208,255,0.95)"; g.lineWidth = 1.5;
     if (ok && pr.x > -40 && pr.x < W + 40 && pr.y > -40 && pr.y < H + 40) {
       const sr = selected.kind === "galaxy" ? 18 : Math.max(screenR(selected, pr) + 7, 10);
-      g.beginPath();
-      for (let k = 0; k < 4; k++) { const a = (k * Math.PI) / 2 + Math.PI / 4; g.moveTo(pr.x + Math.cos(a - 0.35) * sr, pr.y + Math.sin(a - 0.35) * sr); g.arc(pr.x, pr.y, sr, a - 0.35, a + 0.35); }
-      g.stroke();
-      g.font = "500 11px 'IBM Plex Mono', monospace";
-      g.fillText(fmtDist(Math.max(dist3(cam.p, p) - (selected.kind === "galaxy" ? 0 : radiusOf(selected)), 0)), pr.x + sr + 6, pr.y + 14);
+      if (sr < Math.max(W, H)) {
+        g.beginPath();
+        for (let k = 0; k < 4; k++) { const a = (k * Math.PI) / 2 + Math.PI / 4; g.moveTo(pr.x + Math.cos(a - 0.35) * sr, pr.y + Math.sin(a - 0.35) * sr); g.arc(pr.x, pr.y, sr, a - 0.35, a + 0.35); }
+        g.stroke();
+        g.font = "500 11px 'IBM Plex Mono', monospace";
+        g.fillText(fmtDist(Math.max(dist3(cam.p, p) - (selected.kind === "galaxy" ? 0 : radiusOf(selected)), 0)), pr.x + sr + 6, pr.y + 14);
+      }
     } else {
       sv.set(p[0] - cam.p[0], p[1] - cam.p[1], p[2] - cam.p[2]).applyQuaternion(qInv);
       const a = Math.atan2(-sv.y, sv.x);
-      const m = 34, k = Math.min((W / 2 - m) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - m) / Math.abs(Math.sin(a) || 1e-6));
+      const topM = 70, botM = 40 + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sheet-h")) || 0);
+      const m = 34, k = Math.min((W / 2 - m) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - Math.max(topM, botM)) / Math.abs(Math.sin(a) || 1e-6));
       const x = W / 2 + Math.cos(a) * k, y = H / 2 + Math.sin(a) * k;
       g.save(); g.translate(x, y); g.rotate(a); g.beginPath(); g.moveTo(10, 0); g.lineTo(-6, 7); g.lineTo(-2, 0); g.lineTo(-6, -7); g.closePath(); g.fill(); g.restore();
       g.font = "600 11px 'Exo 2', system-ui, sans-serif"; g.textAlign = Math.cos(a) > 0 ? "right" : "left";
       g.fillText(selected.name, x - Math.cos(a) * 18, y - Math.sin(a) * 18); g.textAlign = "left";
     }
   }
-  // centre crosshair while flying
   if (curSpeed > 0) { g.strokeStyle = "rgba(223,231,243,0.35)"; g.lineWidth = 1; g.beginPath(); g.moveTo(W / 2 - 8, H / 2); g.lineTo(W / 2 + 8, H / 2); g.moveTo(W / 2, H / 2 - 8); g.lineTo(W / 2, H / 2 + 8); g.stroke(); }
 }
 
 // ---------- HUD ----------
 let hudT = 0;
 function hud() {
-  const sp = goto ? null : speedMul * near.d * 0.9;
+  const sp = speedMul * near.d * 0.9;
   $("n-speed").textContent = goto ? "Autopilot → " + goto.o.name : fmtSpeed(sp) + (curSpeed ? "" : " (idle)");
-  $("n-near").textContent = near.o ? near.o.name + " · " + fmtDist(near.d) : "–";
+  $("n-near").textContent = ground ? ground.b.name + " · altitude " + fmtDist(Math.max(ground.alt, 0) / LY) : near.o ? near.o.name + " · " + fmtDist(near.d) : "–";
   let loc;
-  const R = Math.hypot(cam.p[0], cam.p[2]);
-  if (sys) loc = sys.star.name + " system · " + fmtN(R) + " ly from galactic centre";
-  else if (R < GAL_R * 1.1 && Math.abs(cam.p[1]) < 3000) loc = "Interstellar space · " + fmtN(R) + " ly from galactic centre";
-  else if (Math.hypot(cam.p[0], cam.p[1], cam.p[2]) < 300000) loc = "Halo of the Aurelis Galaxy";
-  else loc = "Intergalactic space · " + fmtSig(Math.hypot(cam.p[0], cam.p[1], cam.p[2]) / 1e6) + " Mly from home";
+  const ac = AC(), R = Math.hypot(ac[0], ac[2]);
+  if (ground && ground.alt < ground.b.r * 0.05) {
+    const p = posOf(ground.b, [0, 0, 0]);
+    bodyQuat(ground.b, gq).invert();
+    gv.set(cam.p[0] - p[0], cam.p[1] - p[1], cam.p[2] - p[2]).normalize().applyQuaternion(gq);
+    const lat = (Math.asin(clamp(gv.y, -1, 1)) * 180) / Math.PI, lon = (Math.atan2(gv.z, -gv.x) * 180) / Math.PI;
+    loc = "Surface of " + ground.b.name + " · " + fmtN(Math.abs(lat), 2) + "°" + (lat >= 0 ? "N" : "S") + " " + fmtN(Math.abs(lon), 2) + "°" + (lon >= 0 ? "E" : "W");
+  } else if (sys) loc = sys.star.name + " system · " + fmtN(R) + " ly from galactic centre";
+  else if (R < GAL_R * 1.1 && Math.abs(ac[1]) < 3000) loc = "Interstellar space · " + fmtN(R) + " ly from galactic centre";
+  else if (Math.hypot(...ac) < 300000) loc = "Halo of the Aurelis Galaxy";
+  else loc = "Intergalactic space · " + fmtSig(Math.hypot(...ac) / 1e6) + " Mly from home";
   $("n-loc").textContent = loc;
   const dt = new Date(EPOCH + simT * 1000);
   const yr = dt.getUTCFullYear();
   $("c-date").textContent = (yr > 9999 ? fmtN(yr) : yr) + "-" + String(dt.getUTCMonth() + 1).padStart(2, "0") + "-" + String(dt.getUTCDate()).padStart(2, "0") + "  " + dt.toISOString().slice(11, 19) + " UTC";
   if (selected) {
-    const row = [...$("info").querySelectorAll("dl div")].find((d) => d.firstChild.textContent === "Distance");
-    const dd = row && row.lastChild;
-    if (dd) dd.textContent = fmtDist(Math.max(dist3(cam.p, posOf(selected, tmp3)) - (selected.kind === "galaxy" ? 0 : radiusOf(selected)), 0));
+    const row = [...infoEl.querySelectorAll("dl div")].find((d) => d.firstChild.textContent === "Distance");
+    if (row) row.lastChild.textContent = fmtDist(Math.max(dist3(cam.p, posOf(selected, tmp3)) - (selected.kind === "galaxy" ? 0 : radiusOf(selected)), 0));
   }
 }
 
@@ -1501,7 +2016,7 @@ function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
   step(dt);
-  render(now);
+  render();
   hudT += dt;
   if (hudT > 0.15) { hudT = 0; hud(); }
   requestAnimationFrame(loop);
@@ -1513,7 +2028,8 @@ findHome();
 goHome(true);
 updateClockBtns();
 hud();
-toast("Drag to look · W to fly · click and press G to travel");
+syncSheet();
+toast(MOBILE ? "Drag to look · joystick to fly · tap Land" : "Drag to look · W to fly · select a world and press Land");
 requestAnimationFrame(loop);
 })();
 </script>
