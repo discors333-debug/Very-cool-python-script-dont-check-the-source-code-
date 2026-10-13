@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kepler Run</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed orbital canvas; flight data pinned top-left, missions top-right, controls along the bottom edge */
+:root {
+  --void: #04050b;
+  --ink: #e4e9f5;
+  --dim: #8b93a8;
+  --panel: rgba(9, 12, 24, 0.78);
+  --edge: rgba(140, 160, 210, 0.22);
+  --sol: #ffb454;
+  --trace: #7fd6ff;
+  --ok: #8ce0b0;
+  --alert: #ff6470;
+  --display: "Oxanium", "Trebuchet MS", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--void); color: var(--ink); }
+body { font: 13px/1.4 var(--mono); -webkit-user-select: none; user-select: none; }
+canvas#sky { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+
+.hud {
+  position: fixed; z-index: 2;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 6px;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  padding: 12px 14px;
+}
+.tl { top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; width: 228px; }
+.tr { top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; width: 248px; display: grid; gap: 12px; }
+.bl { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); left: 12px; max-width: 520px; }
+
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.brand h1 { margin: 0; font: 700 18px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; }
+.brand .mark { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--sol); position: relative; flex: none; }
+.brand .mark::after { content: ""; position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--trace); top: -4px; left: 3px; }
+
+.label { font: 600 10px/1 var(--display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+dl.readout { margin: 0; display: grid; gap: 5px; }
+dl.readout div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+dl.readout dt { font: 600 10px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+dl.readout dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+dd#r-frame { color: var(--trace); font-family: var(--display); font-weight: 600; letter-spacing: 0.06em; }
+
+.fuel { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin-top: 10px; }
+.fuel .bar { height: 6px; background: rgba(140, 160, 210, 0.15); border-radius: 3px; overflow: hidden; }
+.fuel .bar i { display: block; height: 100%; width: 100%; background: var(--sol); transition: width 0.2s linear; }
+.fuel b { font-weight: 500; font-variant-numeric: tabular-nums; min-width: 4ch; text-align: right; }
+.fuel.low .bar i { background: var(--alert); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { font: 600 10px/1 var(--display); letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 7px; border-radius: 3px; border: 1px solid var(--edge); color: var(--dim); }
+.chip.on { color: var(--void); background: var(--trace); border-color: var(--trace); }
+.chip.warn { color: var(--void); background: var(--sol); border-color: var(--sol); }
+.chip.bad { color: var(--void); background: var(--alert); border-color: var(--alert); }
+.chip.good { color: var(--void); background: var(--ok); border-color: var(--ok); }
+
+details summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details summary::-webkit-details-marker { display: none; }
+details summary b { font: 500 12px var(--mono); color: var(--ink); }
+ul.missions { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+ul.missions li { display: grid; grid-template-columns: 14px 1fr; gap: 8px; align-items: start; color: var(--dim); font-size: 12px; }
+ul.missions li::before { content: ""; width: 10px; height: 10px; margin-top: 3px; border: 1px solid var(--dim); border-radius: 2px; }
+ul.missions li.done { color: var(--ink); }
+ul.missions li.done::before { background: var(--ok); border-color: var(--ok); }
+.target dl.readout { margin-top: 8px; }
+.target dd#t-name { color: var(--sol); font-family: var(--display); font-weight: 600; letter-spacing: 0.06em; }
+
+.keys { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--dim); font-size: 12px; }
+.keys kbd { font: 500 11px var(--mono); color: var(--ink); border: 1px solid var(--edge); border-bottom-width: 2px; border-radius: 3px; padding: 1px 5px; margin-right: 3px; }
+
+#toast {
+  position: fixed; z-index: 3; left: 50%; top: 28%; transform: translate(-50%, 0);
+  font: 600 15px/1.3 var(--display); letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 10px 18px; border-radius: 4px; background: var(--panel); border: 1px solid var(--edge);
+  text-align: center; max-width: calc(100% - 32px); opacity: 0; transition: opacity 0.35s ease; pointer-events: none;
+}
+#toast.show { opacity: 1; }
+#toast.bad { color: var(--alert); }
+#toast.good { color: var(--ok); }
+
+.touch { position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); padding-inline: 12px; display: none; justify-content: space-between; align-items: end; gap: 8px; pointer-events: none; }
+.touch .grp { display: grid; gap: 8px; pointer-events: auto; }
+.touch .row { display: flex; gap: 8px; }
+.touch button {
+  font: 600 11px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; min-width: 52px; height: 48px; padding: 0 10px;
+  touch-action: none; -webkit-tap-highlight-color: transparent;
+}
+.touch button.big { height: 64px; min-width: 76px; border-color: var(--sol); color: var(--sol); }
+.touch button.active { background: var(--trace); color: var(--void); border-color: var(--trace); }
+button:focus-visible { outline: 2px solid var(--trace); outline-offset: 2px; }
+
+@media (pointer: coarse) {
+  .touch { display: flex; }
+  .bl { display: none; }
+}
+@media (max-width: 640px) {
+  .hud { padding: 9px 10px; }
+  .tl { width: calc(50% - 22px); }
+  .tr { width: calc(50% - 22px); }
+  .brand h1 { font-size: 13px; letter-spacing: 0.1em; }
+  dl.readout dd { font-size: 11px; }
+  dl.readout dt { font-size: 9px; letter-spacing: 0.08em; }
+  ul.missions li { font-size: 11px; }
+  .row-hide-narrow { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #toast, .fuel .bar i { transition: none; }
+}
+</style>
+
+<canvas id="sky" aria-label="Orbital flight view"></canvas>
+
+<section class="hud tl" aria-label="Flight data">
+  <div class="brand"><span class="mark" aria-hidden="true"></span><h1>Kepler Run</h1></div>
+  <dl class="readout">
+    <div><dt>Orbiting</dt><dd id="r-frame">Verdant</dd></div>
+    <div><dt>Altitude</dt><dd id="r-alt">–</dd></div>
+    <div><dt>Speed</dt><dd id="r-spd">–</dd></div>
+    <div><dt>Apoapsis</dt><dd id="r-ap">–</dd></div>
+    <div><dt>Periapsis</dt><dd id="r-pe">–</dd></div>
+    <div class="row-hide-narrow"><dt>Eccentricity</dt><dd id="r-ecc">–</dd></div>
+    <div class="row-hide-narrow"><dt>Mission time</dt><dd id="r-met">T+ 00:00:00</dd></div>
+  </dl>
+  <div class="fuel" id="fuel"><span class="label">Fuel</span><div class="bar"><i id="fuel-bar"></i></div><b id="r-fuel">100%</b></div>
+  <div class="chips"><span id="c-warp" class="chip">Warp 1×</span><span id="c-hold" class="chip">Hold off</span><span id="c-state" class="chip">Orbit</span></div>
+</section>
+
+<section class="hud tr" aria-label="Missions and target">
+  <details id="mis" open>
+    <summary><span class="label">Missions</span><b id="mis-count">0/8</b></summary>
+    <ul class="missions" id="mis-list"></ul>
+  </details>
+  <div class="target">
+    <span class="label">Target</span>
+    <dl class="readout">
+      <div><dt>Body</dt><dd id="t-name">Pale</dd></div>
+      <div><dt>Distance</dt><dd id="t-dist">–</dd></div>
+      <div><dt>Rel. speed</dt><dd id="t-vel">–</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="hud bl keys" id="help" aria-label="Controls">
+  <span><kbd>W</kbd><kbd>S</kbd>thrust / retro</span>
+  <span><kbd>A</kbd><kbd>D</kbd>rotate</span>
+  <span><kbd>P</kbd>hold prograde</span>
+  <span><kbd>O</kbd>hold retrograde</span>
+  <span><kbd>,</kbd><kbd>.</kbd>time warp</span>
+  <span><kbd>Scroll</kbd>zoom</span>
+  <span><kbd>M</kbd>system map</span>
+  <span><kbd>Tab</kbd>next target</span>
+  <span><kbd>R</kbd>relaunch</span>
+  <span><kbd>H</kbd>hide help</span>
+</section>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="touch" aria-label="Touch controls">
+  <div class="grp">
+    <div class="row">
+      <button type="button" id="b-zout" aria-label="Zoom out">−</button>
+      <button type="button" id="b-zin" aria-label="Zoom in">+</button>
+      <button type="button" id="b-map">Map</button>
+    </div>
+    <div class="row">
+      <button type="button" class="big" data-key="left" aria-label="Rotate left">◁</button>
+      <button type="button" class="big" data-key="right" aria-label="Rotate right">▷</button>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="row">
+      <button type="button" id="b-wdn" aria-label="Slower time warp">Warp−</button>
+      <button type="button" id="b-wup" aria-label="Faster time warp">Warp+</button>
+    </div>
+    <div class="row">
+      <button type="button" id="b-pro">Pro</button>
+      <button type="button" id="b-ret">Retro</button>
+      <button type="button" id="b-tgt">Tgt</button>
+    </div>
+    <div class="row">
+      <button type="button" data-key="retro">Rev</button>
+      <button type="button" class="big" data-key="thrust">Thrust</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const TAU = Math.PI * 2;
+  const css = getComputedStyle(document.documentElement);
+  const C = {
+    void: css.getPropertyValue("--void").trim() || "#04050b",
+    ink: css.getPropertyValue("--ink").trim() || "#e4e9f5",
+    dim: css.getPropertyValue("--dim").trim() || "#8b93a8",
+    sol: css.getPropertyValue("--sol").trim() || "#ffb454",
+    trace: css.getPropertyValue("--trace").trim() || "#7fd6ff",
+    ok: css.getPropertyValue("--ok").trim() || "#8ce0b0",
+    alert: css.getPropertyValue("--alert").trim() || "#ff6470",
+  };
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- tiny seeded RNG ----------
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ---------- the system (1 unit = 1 km, mu in km^3/s^2) ----------
+  const B = [];
+  function addBody(o) {
+    o.i = B.length;
+    o.children = [];
+    if (o.parent) {
+      o.w = Math.sqrt(o.parent.mu / o.d ** 3);
+      o.soi = o.d * Math.pow(o.mu / o.parent.mu, 0.4);
+      o.depth = o.parent.depth + 1;
+      o.parent.children.push(o);
+    } else { o.soi = Infinity; o.depth = 0; }
+    const r = rng(o.i * 9973 + 17);
+    o.spots = Array.from({ length: o.spotCount ?? 7 }, () => ({
+      a: r() * TAU, d: Math.sqrt(r()) * 0.8, s: 0.08 + r() * 0.22, al: 0.12 + r() * 0.2,
+    }));
+    B.push(o);
+    return o;
+  }
+  const sol = addBody({ name: "Sol", r: 120, mu: 2.5e6, kind: "star" });
+  const ember = addBody({ name: "Ember", r: 18, mu: 3e3, parent: sol, d: 900, phase: 2.1, c: ["#e08a55", "#5a2216"], spot: "#3a120a" });
+  const verdant = addBody({ name: "Verdant", r: 40, mu: 1.2e4, parent: sol, d: 1700, phase: 0.0, c: ["#6cc0aa", "#163a48"], spot: "#2d6b4c", atmo: "rgba(127,214,255,0.28)" });
+  const pale = addBody({ name: "Pale", r: 9, mu: 500, parent: verdant, d: 140, phase: 1.3, c: ["#d3d0c6", "#4a4842"], spot: "#7b786f" });
+  const tessel = addBody({ name: "Tessel", r: 85, mu: 1e5, parent: sol, d: 3200, phase: 4.0, c: ["#e2c393", "#5b4630"], bands: true, ring: true, spotCount: 0, gas: true });
+  const shard = addBody({ name: "Shard", r: 12, mu: 1e3, parent: tessel, d: 260, phase: 0.6, c: ["#a99a8a", "#3b322b"], spot: "#5d5047" });
+  const frost = addBody({ name: "Frost", r: 28, mu: 7e3, parent: sol, d: 5200, phase: 2.8, c: ["#cdeaf7", "#2c4b66"], spot: "#9cc6dc" });
+  const N = B.length;
+
+  const BX = new Float64Array(N), BY = new Float64Array(N), BVX = new Float64Array(N), BVY = new Float64Array(N);
+  const PX = new Float64Array(N), PY = new Float64Array(N), PVX = new Float64Array(N), PVY = new Float64Array(N);
+  function computeBodies(t, X, Y, VX, VY) {
+    for (let i = 0; i < N; i++) {
+      const b = B[i];
+      if (!b.parent) { X[i] = Y[i] = VX[i] = VY[i] = 0; continue; }
+      const p = b.parent.i, a = b.phase + b.w * t, c = Math.cos(a), s = Math.sin(a);
+      X[i] = X[p] + b.d * c; Y[i] = Y[p] + b.d * s;
+      VX[i] = VX[p] - b.d * b.w * s; VY[i] = VY[p] + b.d * b.w * c;
+    }
+  }
+
+  const SHIP_R = 4;
+  let gx = 0, gy = 0, hitI = -1;
+  function grav(x, y, X, Y) {
+    gx = 0; gy = 0; hitI = -1;
+    for (let i = 0; i < N; i++) {
+      const dx = X[i] - x, dy = Y[i] - y, r2 = dx * dx + dy * dy, r = Math.sqrt(r2);
+      if (r < B[i].r + SHIP_R) hitI = i;
+      const f = B[i].mu / (r2 * r);
+      gx += dx * f; gy += dy * f;
+    }
+  }
+  function frameOf(x, y) {
+    let best = 0;
+    for (let i = 1; i < N; i++) {
+      const b = B[i], dx = x - BX[i], dy = y - BY[i];
+      if (dx * dx + dy * dy < b.soi * b.soi && b.depth > B[best].depth) best = i;
+    }
+    return best;
+  }
+  function elements(rx, ry, vx, vy, mu) {
+    const r = Math.hypot(rx, ry), v2 = vx * vx + vy * vy, eps = v2 / 2 - mu / r;
+    const h = rx * vy - ry * vx, rv = rx * vx + ry * vy;
+    const ex = ((v2 - mu / r) * rx - rv * vx) / mu, ey = ((v2 - mu / r) * ry - rv * vy) / mu;
+    const e = Math.hypot(ex, ey), p = (h * h) / mu;
+    const bound = eps < 0;
+    const a = bound ? -mu / (2 * eps) : Infinity;
+    return { r, v: Math.sqrt(v2), e, ex, ey, pe: p / (1 + e), ap: bound ? p / (1 - e) : Infinity, bound, period: bound ? TAU * Math.sqrt(a ** 3 / mu) : Infinity };
+  }
+
+  // ---------- ship ----------
+  const THRUST = 12, RETRO = 6, BURN = 5, TURN = 2.6;
+  const ship = { x: 0, y: 0, vx: 0, vy: 0, ang: 0, fuel: 100, landed: -1, nx: 0, ny: 0, dead: false, deadT: 0 };
+  let simT = 0, warpI = 0, hold = "off", frameI = verdant.i, targetI = pale.i;
+  const WARPS = [1, 2, 5, 10, 25, 50, 100, 250];
+
+  function spawn() {
+    computeBodies(simT, BX, BY, BVX, BVY);
+    const th = Math.atan2(BY[verdant.i], BX[verdant.i]) + Math.PI * 0.5, r = 80, v = Math.sqrt(verdant.mu / r);
+    ship.x = BX[verdant.i] + r * Math.cos(th); ship.y = BY[verdant.i] + r * Math.sin(th);
+    ship.vx = BVX[verdant.i] - v * Math.sin(th); ship.vy = BVY[verdant.i] + v * Math.cos(th);
+    ship.ang = th + Math.PI / 2; ship.fuel = 100; ship.landed = -1; ship.dead = false;
+    hold = "off"; warpI = 0; frameI = verdant.i; noFuelWarned = false;
+  }
+
+  // ---------- camera & canvas ----------
+  const cv = document.getElementById("sky"), ctx = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  const cam = { x: 0, y: 0, z: 2.4, map: false, zSaved: 2.4 };
+  const backdrop = document.createElement("canvas");
+  const stars = [0.02, 0.06, 0.15].map((par, li) => {
+    const r = rng(101 + li);
+    return { par, pts: Array.from({ length: 180 - li * 50 }, () => ({ x: r(), y: r(), s: 0.4 + r() * (0.6 + li * 0.5), b: 0.3 + r() * 0.7, tw: r() * TAU })) };
+  });
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    backdrop.width = cv.width; backdrop.height = cv.height;
+    const b = backdrop.getContext("2d");
+    b.fillStyle = C.void; b.fillRect(0, 0, backdrop.width, backdrop.height);
+    const r = rng(7);
+    const tints = ["rgba(70,60,140,", "rgba(40,90,130,", "rgba(130,60,80,"];
+    for (let k = 0; k < 5; k++) {
+      const x = r() * backdrop.width, y = r() * backdrop.height, rad = (0.3 + r() * 0.5) * Math.max(backdrop.width, backdrop.height);
+      const g = b.createRadialGradient(x, y, 0, x, y, rad);
+      const t = tints[k % 3];
+      g.addColorStop(0, t + "0.10)"); g.addColorStop(1, t + "0)");
+      b.fillStyle = g; b.fillRect(0, 0, backdrop.width, backdrop.height);
+    }
+    if (cam.map) cam.z = mapZoom();
+  }
+  const mapZoom = () => Math.min(W, H) / (2 * 5650);
+  const sx = (x) => W / 2 + (x - cam.x) * cam.z;
+  const sy = (y) => H / 2 + (y - cam.y) * cam.z;
+
+  // ---------- input ----------
+  const keys = { thrust: false, retro: false, left: false, right: false };
+  const keyMap = { KeyW: "thrust", ArrowUp: "thrust", KeyS: "retro", ArrowDown: "retro", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right" };
+  addEventListener("keydown", (e) => {
+    if (keyMap[e.code]) { keys[keyMap[e.code]] = true; e.preventDefault(); return; }
+    switch (e.code) {
+      case "Comma": setWarp(warpI - 1); break;
+      case "Period": setWarp(warpI + 1); break;
+      case "KeyP": toggleHold("pro"); break;
+      case "KeyO": toggleHold("retro"); break;
+      case "KeyM": toggleMap(); break;
+      case "KeyR": spawn(); toast("Relaunched to Verdant orbit"); break;
+      case "KeyH": help.hidden = !help.hidden; break;
+      case "Tab": e.preventDefault(); cycleTarget(); break;
+      case "Equal": case "NumpadAdd": zoomBy(1.25); break;
+      case "Minus": case "NumpadSubtract": zoomBy(0.8); break;
+      default: return;
+    }
+  });
+  addEventListener("keyup", (e) => { if (keyMap[e.code]) keys[keyMap[e.code]] = false; });
+  addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
+  cv.addEventListener("wheel", (e) => { e.preventDefault(); zoomBy(Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+
+  document.querySelectorAll("[data-key]").forEach((btn) => {
+    const k = btn.dataset.key;
+    const on = (e) => { e.preventDefault(); keys[k] = true; btn.classList.add("active"); try { btn.setPointerCapture(e.pointerId); } catch (_) {} };
+    const off = () => { keys[k] = false; btn.classList.remove("active"); };
+    btn.addEventListener("pointerdown", on);
+    btn.addEventListener("pointerup", off);
+    btn.addEventListener("pointercancel", off);
+    btn.addEventListener("lostpointercapture", off);
+  });
+  const tap = (id, fn) => document.getElementById(id).addEventListener("click", fn);
+  tap("b-zin", () => zoomBy(1.4)); tap("b-zout", () => zoomBy(1 / 1.4)); tap("b-map", toggleMap);
+  tap("b-wup", () => setWarp(warpI + 1)); tap("b-wdn", () => setWarp(warpI - 1));
+  tap("b-pro", () => toggleHold("pro")); tap("b-ret", () => toggleHold("retro")); tap("b-tgt", cycleTarget);
+
+  function zoomBy(f) { cam.z = Math.min(14, Math.max(0.025, cam.z * f)); if (cam.map) cam.map = false; }
+  function toggleMap() {
+    cam.map = !cam.map;
+    if (cam.map) { cam.zSaved = cam.z; cam.z = mapZoom(); } else cam.z = cam.zSaved;
+  }
+  function setWarp(i) {
+    i = Math.max(0, Math.min(WARPS.length - 1, i));
+    if (i > 0 && (keys.thrust || keys.retro)) { toast("Cut engines before warping"); return; }
+    warpI = i;
+  }
+  function toggleHold(m) { hold = hold === m ? "off" : m; }
+  function cycleTarget() { targetI = (targetI + 1) % N; }
+
+  // ---------- toast ----------
+  const toastEl = document.getElementById("toast");
+  let toastTimer = 0;
+  function toast(msg, kind = "") {
+    toastEl.textContent = msg; toastEl.className = "show " + kind;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => (toastEl.className = kind), 2600);
+  }
+
+  // ---------- missions ----------
+  const MISSIONS = [
+    { id: "orbit", text: "Raise Verdant periapsis above 60 km" },
+    { id: "pale-soi", text: "Enter Pale's sphere of influence" },
+    { id: "pale-land", text: "Land on Pale" },
+    { id: "ember", text: "Land on Ember" },
+    { id: "sol", text: "Dive below 300 km over Sol and survive" },
+    { id: "tessel", text: "Capture into orbit around Tessel" },
+    { id: "shard", text: "Land on Shard" },
+    { id: "frost", text: "Land on Frost, at the system's edge" },
+  ];
+  let done = {};
+  try { done = JSON.parse(localStorage.getItem("kepler-run-missions") || "{}") || {}; } catch (_) { done = {}; }
+  const misList = document.getElementById("mis-list");
+  MISSIONS.forEach((m) => { const li = document.createElement("li"); li.textContent = m.text; li.id = "m-" + m.id; misList.appendChild(li); });
+  if (matchMedia("(max-width: 640px)").matches) document.getElementById("mis").open = false;
+  function complete(id) {
+    if (done[id]) return;
+    done[id] = true;
+    try { localStorage.setItem("kepler-run-missions", JSON.stringify(done)); } catch (_) {}
+    const m = MISSIONS.find((q) => q.id === id);
+    toast("Mission complete · " + m.text, "good");
+  }
+  function checkMissions(el) {
+    const f = B[frameI];
+    if (frameI === verdant.i && el.bound && el.pe - f.r > 60 && el.ap < f.soi) complete("orbit");
+    if (frameI === pale.i) complete("pale-soi");
+    if (ship.landed === pale.i) complete("pale-land");
+    if (ship.landed === ember.i) complete("ember");
+    if (ship.landed === shard.i) complete("shard");
+    if (ship.landed === frost.i) complete("frost");
+    if (frameI === tessel.i && el.bound && el.pe > tessel.r && el.ap < tessel.soi) complete("tessel");
+    if (!ship.dead && Math.hypot(ship.x, ship.y) - sol.r < 300) complete("sol");
+  }
+
+  // ---------- particles ----------
+  const parts = [];
+  function puff(x, y, vx, vy, life, col, size) { if (parts.length < 900) parts.push({ x, y, vx, vy, life, max: life, col, size }); }
+  function explode() {
+    for (let k = 0; k < 120; k++) {
+      const a = Math.random() * TAU, s = 5 + Math.random() * 45;
+      puff(ship.x, ship.y, ship.vx * 0.2 + Math.cos(a) * s, ship.vy * 0.2 + Math.sin(a) * s, 0.8 + Math.random() * 1.6, k % 3 ? C.sol : C.alert, 1 + Math.random() * 2.5);
+    }
+  }
+
+  // ---------- collisions ----------
+  function handleHit(i) {
+    const b = B[i];
+    const dx = ship.x - BX[i], dy = ship.y - BY[i], r = Math.hypot(dx, dy) || 1;
+    const nx = dx / r, ny = dy / r;
+    const rvx = ship.vx - BVX[i], rvy = ship.vy - BVY[i], spd = Math.hypot(rvx, rvy);
+    const upright = Math.cos(ship.ang) * nx + Math.sin(ship.ang) * ny > Math.cos((40 * Math.PI) / 180);
+    if (b.kind === "star") return crash("Burned up in Sol");
+    if (b.gas) return crash("Lost in Tessel's cloud decks");
+    if (spd < 4 && upright) {
+      ship.landed = i; ship.nx = nx; ship.ny = ny; hold = "off";
+      toast("Touchdown on " + b.name + " · " + spd.toFixed(1) + " km/s", "good");
+      return;
+    }
+    crash(spd >= 4 ? "Impact on " + b.name + " at " + spd.toFixed(1) + " km/s" : "Tipped over on " + b.name);
+  }
+  function crash(msg) {
+    ship.dead = true; ship.deadT = 3; warpI = 0;
+    explode(); toast(msg + " · relaunching", "bad");
+  }
+
+  // ---------- simulation ----------
+  let noFuelWarned = false;
+  const STEP = 1 / 120;
+  function update(dt) {
+    const warp = WARPS[warpI];
+    const simDt = dt * warp;
+    lastThr = false; lastRet = false;
+
+    if (ship.dead) {
+      simT += simDt;
+      computeBodies(simT, BX, BY, BVX, BVY);
+      ship.deadT -= dt;
+      if (ship.deadT <= 0) spawn();
+      return;
+    }
+
+    let thr = keys.thrust && ship.fuel > 0;
+    let ret = keys.retro && ship.fuel > 0 && ship.landed < 0;
+    if ((keys.thrust || keys.retro) && ship.fuel <= 0 && !noFuelWarned) { noFuelWarned = true; toast("Tanks dry · land anywhere to refuel", "bad"); }
+    if ((thr || ret) && warpI > 0) warpI = 0;
+
+    // attitude
+    if (ship.landed < 0) {
+      if (keys.left || keys.right) {
+        hold = "off";
+        ship.ang += (keys.right ? 1 : -1) * TURN * dt;
+      } else if (hold !== "off") {
+        const f = frameI, rvx = ship.vx - BVX[f], rvy = ship.vy - BVY[f];
+        let want = Math.atan2(rvy, rvx) + (hold === "retro" ? Math.PI : 0);
+        let d = ((want - ship.ang + Math.PI * 3) % TAU) - Math.PI;
+        const m = TURN * dt * Math.max(1, Math.min(warp, 8));
+        ship.ang += Math.abs(d) < m ? d : Math.sign(d) * m;
+      }
+    }
+
+    if (ship.landed >= 0) {
+      const li = ship.landed;
+      if (thr) {
+        ship.landed = -1;
+        ship.x = BX[li] + ship.nx * (B[li].r + SHIP_R + 0.6);
+        ship.y = BY[li] + ship.ny * (B[li].r + SHIP_R + 0.6);
+      } else {
+        simT += simDt;
+        computeBodies(simT, BX, BY, BVX, BVY);
+        ship.x = BX[li] + ship.nx * (B[li].r + SHIP_R); ship.y = BY[li] + ship.ny * (B[li].r + SHIP_R);
+        ship.vx = BVX[li]; ship.vy = BVY[li];
+        ship.ang = Math.atan2(ship.ny, ship.nx);
+        ship.fuel = Math.min(100, ship.fuel + 10 * simDt);
+        if (ship.fuel > 5) noFuelWarned = false;
+        return;
+      }
+    }
+
+    const ca = Math.cos(ship.ang), sa = Math.sin(ship.ang);
+    const acc = (thr ? THRUST : 0) - (ret ? RETRO : 0);
+    const n = Math.min(4000, Math.max(1, Math.ceil(simDt / STEP)));
+    const h = simDt / n;
+    for (let k = 0; k < n; k++) {
+      computeBodies(simT, BX, BY, BVX, BVY);
+      grav(ship.x, ship.y, BX, BY);
+      if (hitI >= 0) { handleHit(hitI); if (ship.dead || ship.landed >= 0) { simT += h * (n - k); computeBodies(simT, BX, BY, BVX, BVY); return; } }
+      ship.vx += (gx + ca * acc) * h; ship.vy += (gy + sa * acc) * h;
+      ship.x += ship.vx * h; ship.y += ship.vy * h;
+      simT += h;
+    }
+    computeBodies(simT, BX, BY, BVX, BVY);
+    grav(ship.x, ship.y, BX, BY);
+    if (hitI >= 0) handleHit(hitI);
+
+    if (thr || ret) {
+      ship.fuel = Math.max(0, ship.fuel - (thr ? BURN : BURN / 2) * simDt);
+      if (warp === 1) {
+        const back = thr ? -1 : 1;
+        for (let q = 0; q < 2; q++) {
+          const spread = (Math.random() - 0.5) * 0.5;
+          const ex = Math.cos(ship.ang + spread) * back, ey = Math.sin(ship.ang + spread) * back;
+          puff(ship.x + ca * SHIP_R * back, ship.y + sa * SHIP_R * back, ship.vx + ex * 15, ship.vy + ey * 15, 0.35 + Math.random() * 0.3, C.sol, 1 + Math.random());
+        }
+      }
+    }
+    lastThr = thr; lastRet = ret;
+  }
+  let lastThr = false, lastRet = false;
+
+  // ---------- trajectory prediction ----------
+  const pred = { n: 0, xs: new Float64Array(2400), ys: new Float64Array(2400), frame: 0, event: null };
+  function predict(el) {
+    pred.n = 0; pred.event = null;
+    if (ship.dead || ship.landed >= 0) return;
+    const f = frameI, fb = B[f];
+    let x = ship.x, y = ship.y, vx = ship.vx, vy = ship.vy, t = simT, tt = 0;
+    const horizon = el.bound && el.ap < fb.soi ? el.period * 1.01 : 4000;
+    let n = 0;
+    outer: while (n < 2399 && tt < horizon) {
+      computeBodies(t, PX, PY, PVX, PVY);
+      const rx = x - PX[f], ry = y - PY[f], r = Math.hypot(rx, ry);
+      pred.xs[n] = rx; pred.ys[n] = ry; n++;
+      grav(x, y, PX, PY);
+      if (hitI >= 0) { pred.event = { type: "impact", name: B[hitI].name, x: rx, y: ry }; break; }
+      if (f !== 0 && r > fb.soi) { pred.event = { type: "exit", name: fb.name, x: rx, y: ry }; break; }
+      for (const c of fb.children) {
+        const dx = x - PX[c.i], dy = y - PY[c.i];
+        if (dx * dx + dy * dy < c.soi * c.soi) { pred.event = { type: "enc", name: c.name, x: rx, y: ry }; break outer; }
+      }
+      const h = Math.max(1 / 60, Math.min(30, 0.025 * Math.sqrt((r * r * r) / fb.mu)));
+      vx += gx * h; vy += gy * h; x += vx * h; y += vy * h; t += h; tt += h;
+    }
+    pred.n = n; pred.frame = f;
+  }
+
+  // ---------- rendering ----------
+  function drawStars(now) {
+    ctx.drawImage(backdrop, 0, 0, W, H);
+    for (const L of stars) {
+      const ox = cam.x * L.par, oy = cam.y * L.par;
+      for (const s of L.pts) {
+        let x = (s.x * W - ox) % W; if (x < 0) x += W;
+        let y = (s.y * H - oy) % H; if (y < 0) y += H;
+        const tw = reduceMotion ? 1 : 0.75 + 0.25 * Math.sin(now * 0.0013 + s.tw);
+        ctx.globalAlpha = s.b * tw;
+        ctx.fillStyle = C.ink;
+        ctx.fillRect(x, y, s.s, s.s);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBodyOrbits() {
+    ctx.lineWidth = 1;
+    for (const b of B) {
+      if (!b.parent) continue;
+      const rpx = b.d * cam.z;
+      if (rpx < 6) continue;
+      const p = b.parent.i;
+      ctx.strokeStyle = b.i === targetI ? "rgba(255,180,84,0.35)" : "rgba(140,160,210,0.14)";
+      ctx.beginPath(); ctx.arc(sx(BX[p]), sy(BY[p]), rpx, 0, TAU); ctx.stroke();
+    }
+    if (frameI !== 0) {
+      const f = B[frameI];
+      ctx.setLineDash([4, 6]); ctx.strokeStyle = "rgba(127,214,255,0.18)";
+      ctx.beginPath(); ctx.arc(sx(BX[frameI]), sy(BY[frameI]), f.soi * cam.z, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  function drawSun(now) {
+    const x = sx(0), y = sy(0), r = Math.max(sol.r * cam.z, 5);
+    const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 5);
+    g.addColorStop(0, "rgba(255,190,100,0.55)"); g.addColorStop(0.25, "rgba(255,150,70,0.15)"); g.addColorStop(1, "rgba(255,120,60,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 5, 0, TAU); ctx.fill();
+    const core = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, 0, x, y, r);
+    core.addColorStop(0, "#fff6dc"); core.addColorStop(0.6, "#ffd27a"); core.addColorStop(1, C.sol);
+    ctx.fillStyle = core; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    if (!reduceMotion && r > 20) {
+      ctx.strokeStyle = "rgba(255,210,140,0.25)"; ctx.lineWidth = 2;
+      for (let k = 0; k < 3; k++) {
+        const rr = r * (1.05 + 0.04 * Math.sin(now * 0.002 + k * 2));
+        ctx.beginPath(); ctx.arc(x, y, rr, 0, TAU); ctx.stroke();
+      }
+    }
+  }
+
+  function drawPlanet(b) {
+    const x = sx(BX[b.i]), y = sy(BY[b.i]), r = Math.max(b.r * cam.z, 2.5);
+    if (x < -r * 3 || x > W + r * 3 || y < -r * 3 || y > H + r * 3) return;
+    const lx = -BX[b.i], ly = -BY[b.i], ll = Math.hypot(lx, ly) || 1;
+    const ux = lx / ll, uy = ly / ll;
+    if (b.ring) {
+      ctx.strokeStyle = "rgba(226,195,147,0.22)"; ctx.lineWidth = Math.max(1, r * 0.35);
+      ctx.beginPath(); ctx.arc(x, y, r * 1.75, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = "rgba(226,195,147,0.12)"; ctx.lineWidth = Math.max(1, r * 0.15);
+      ctx.beginPath(); ctx.arc(x, y, r * 2.15, 0, TAU); ctx.stroke();
+    }
+    if (b.atmo && r > 4) {
+      const a = ctx.createRadialGradient(x, y, r * 0.95, x, y, r * 1.3);
+      a.addColorStop(0, b.atmo); a.addColorStop(1, "rgba(127,214,255,0)");
+      ctx.fillStyle = a; ctx.beginPath(); ctx.arc(x, y, r * 1.3, 0, TAU); ctx.fill();
+    }
+    const g = ctx.createRadialGradient(x + ux * r * 0.45, y + uy * r * 0.45, r * 0.05, x, y, r * 1.05);
+    g.addColorStop(0, b.c[0]); g.addColorStop(1, b.c[1]);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    if (r > 8) {
+      ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.clip();
+      if (b.bands) {
+        for (let k = -5; k <= 5; k++) {
+          ctx.fillStyle = k % 2 ? "rgba(120,80,40,0.18)" : "rgba(255,235,200,0.10)";
+          ctx.fillRect(x - r, y + (k / 5.5) * r - r * 0.06, r * 2, r * (0.08 + (Math.abs(k) % 3) * 0.03));
+        }
+      }
+      for (const s of b.spots) {
+        ctx.globalAlpha = s.al; ctx.fillStyle = b.spot;
+        ctx.beginPath(); ctx.arc(x + Math.cos(s.a) * s.d * r, y + Math.sin(s.a) * s.d * r, s.s * r, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      const night = ctx.createLinearGradient(x + ux * r, y + uy * r, x - ux * r, y - uy * r);
+      night.addColorStop(0, "rgba(4,5,11,0)"); night.addColorStop(0.55, "rgba(4,5,11,0.15)"); night.addColorStop(1, "rgba(4,5,11,0.7)");
+      ctx.fillStyle = night; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      ctx.restore();
+    }
+  }
+
+  function drawLabels() {
+    ctx.font = "600 11px Oxanium, system-ui, sans-serif";
+    ctx.textBaseline = "middle";
+    for (const b of B) {
+      const r = Math.max(b.r * cam.z, 2.5), x = sx(BX[b.i]), y = sy(BY[b.i]);
+      if (b.parent && b.parent.i !== 0 && b.d * cam.z < 14) continue;
+      if (x < -60 || x > W + 60 || y < -20 || y > H + 20) continue;
+      ctx.fillStyle = b.i === targetI ? C.sol : "rgba(228,233,245,0.7)";
+      ctx.fillText(b.name.toUpperCase(), x + r + 7, y - r * 0.4 - 2);
+    }
+  }
+
+  function drawPrediction(el) {
+    if (pred.n < 2) return;
+    const f = pred.frame, ox = BX[f], oy = BY[f];
+    ctx.lineWidth = 1.6;
+    const seg = 24;
+    for (let s = 0; s < pred.n - 1; s += seg) {
+      const a = 0.9 - (s / pred.n) * 0.65;
+      ctx.strokeStyle = `rgba(127,214,255,${a.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(sx(ox + pred.xs[s]), sy(oy + pred.ys[s]));
+      for (let k = s + 1; k <= Math.min(s + seg, pred.n - 1); k++) ctx.lineTo(sx(ox + pred.xs[k]), sy(oy + pred.ys[k]));
+      ctx.stroke();
+    }
+    ctx.font = "600 11px Oxanium, system-ui, sans-serif"; ctx.textBaseline = "middle";
+    const fb = B[f];
+    if (el.e > 0.01) {
+      const ux = el.ex / el.e, uy = el.ey / el.e;
+      const mark = (d, label, col) => {
+        const x = sx(ox + ux * d), y = sy(oy + uy * d);
+        ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 5); ctx.lineTo(x - 5, y); ctx.closePath(); ctx.fill();
+        ctx.fillText(label, x + 8, y);
+      };
+      if (el.pe > fb.r) mark(el.pe, "Pe " + fmtD(el.pe - fb.r), C.trace);
+      if (el.bound && el.ap < fb.soi) mark(-el.ap, "Ap " + fmtD(el.ap - fb.r), C.trace);
+    }
+    if (pred.event) {
+      const ev = pred.event, x = sx(ox + ev.x), y = sy(oy + ev.y);
+      const col = ev.type === "impact" ? C.alert : C.sol;
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, TAU); ctx.stroke();
+      ctx.fillStyle = col;
+      const txt = ev.type === "impact" ? "Impact · " + ev.name : ev.type === "exit" ? "Escape " + ev.name : "Encounter · " + ev.name;
+      ctx.fillText(txt.toUpperCase(), x + 10, y);
+    }
+  }
+
+  function drawParticles(dt) {
+    for (let k = parts.length - 1; k >= 0; k--) {
+      const p = parts[k];
+      p.life -= dt; if (p.life <= 0) { parts.splice(k, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.fillStyle = p.col;
+      const s = p.size * Math.max(1, Math.min(cam.z, 3));
+      ctx.fillRect(sx(p.x) - s / 2, sy(p.y) - s / 2, s, s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawShip(now) {
+    if (ship.dead) return;
+    const x = sx(ship.x), y = sy(ship.y);
+    const size = Math.max(8, SHIP_R * cam.z * 1.1);
+    const f = frameI, rvx = ship.vx - BVX[f], rvy = ship.vy - BVY[f], rv = Math.hypot(rvx, rvy);
+
+    // nav ring
+    const R = size + 22;
+    ctx.strokeStyle = "rgba(228,233,245,0.12)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.stroke();
+    if (rv > 0.05 && ship.landed < 0) {
+      const pa = Math.atan2(rvy, rvx);
+      const px = x + Math.cos(pa) * R, py = y + Math.sin(pa) * R;
+      ctx.strokeStyle = C.ok; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.stroke();
+      for (const o of [-Math.PI / 2, 0, Math.PI / 2]) {
+        const a = pa + o; ctx.beginPath();
+        ctx.moveTo(px + Math.cos(a) * 4, py + Math.sin(a) * 4); ctx.lineTo(px + Math.cos(a) * 8, py + Math.sin(a) * 8); ctx.stroke();
+      }
+      const qx = x - Math.cos(pa) * R, qy = y - Math.sin(pa) * R;
+      ctx.strokeStyle = "rgba(140,224,176,0.55)";
+      ctx.beginPath(); ctx.moveTo(qx - 3.5, qy - 3.5); ctx.lineTo(qx + 3.5, qy + 3.5); ctx.moveTo(qx + 3.5, qy - 3.5); ctx.lineTo(qx - 3.5, qy + 3.5); ctx.stroke();
+    }
+    if (targetI !== f) {
+      const ta = Math.atan2(BY[targetI] - ship.y, BX[targetI] - ship.x);
+      const tx = x + Math.cos(ta) * R, ty = y + Math.sin(ta) * R;
+      ctx.fillStyle = C.sol;
+      ctx.beginPath(); ctx.moveTo(tx, ty - 4); ctx.lineTo(tx + 4, ty); ctx.lineTo(tx, ty + 4); ctx.lineTo(tx - 4, ty); ctx.closePath(); ctx.fill();
+    }
+
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ship.ang);
+    if (lastThr && !ship.dead) {
+      const len = size * (1.5 + (reduceMotion ? 0.3 : Math.random() * 0.7));
+      const g = ctx.createLinearGradient(-size * 0.5, 0, -size * 0.5 - len, 0);
+      g.addColorStop(0, "rgba(255,240,200,0.95)"); g.addColorStop(0.4, "rgba(255,180,84,0.8)"); g.addColorStop(1, "rgba(255,100,60,0)");
+      ctx.fillStyle = g; ctx.beginPath();
+      ctx.moveTo(-size * 0.5, -size * 0.3); ctx.lineTo(-size * 0.5 - len, 0); ctx.lineTo(-size * 0.5, size * 0.3); ctx.closePath(); ctx.fill();
+    }
+    if (lastRet && !ship.dead) {
+      ctx.fillStyle = "rgba(255,200,120,0.85)";
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(size * 0.4, s * size * 0.35); ctx.lineTo(size * 1.3, s * size * 0.55); ctx.lineTo(size * 0.4, s * size * 0.5); ctx.closePath(); ctx.fill(); }
+    }
+    ctx.fillStyle = C.ink; ctx.strokeStyle = C.void; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(size, 0); ctx.lineTo(-size * 0.7, size * 0.6); ctx.lineTo(-size * 0.4, 0); ctx.lineTo(-size * 0.7, -size * 0.6); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C.trace; ctx.beginPath(); ctx.arc(size * 0.2, 0, size * 0.14, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawTargetArrow() {
+    const tx = sx(BX[targetI]), ty = sy(BY[targetI]);
+    const m = 40;
+    if (tx > m && tx < W - m && ty > m && ty < H - m) return;
+    const cx = W / 2, cy = H / 2, a = Math.atan2(ty - cy, tx - cx);
+    const k = Math.min((W / 2 - m) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - m) / Math.abs(Math.sin(a) || 1e-6));
+    const x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.fillStyle = C.sol; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, 7); ctx.lineTo(-2, 0); ctx.lineTo(-6, -7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.font = "600 10px Oxanium, system-ui, sans-serif"; ctx.fillStyle = C.sol;
+    ctx.textAlign = Math.cos(a) > 0 ? "right" : "left"; ctx.textBaseline = "middle";
+    ctx.fillText(B[targetI].name.toUpperCase(), x - Math.cos(a) * 16, y - Math.sin(a) * 16);
+    ctx.textAlign = "left";
+  }
+
+  // ---------- HUD ----------
+  const $ = (id) => document.getElementById(id);
+  const help = $("help");
+  const fmtD = (d) => (!isFinite(d) ? "escape" : Math.abs(d) >= 10000 ? (d / 1000).toFixed(1) + "k km" : d.toFixed(Math.abs(d) < 100 ? 1 : 0) + " km");
+  const fmtV = (v) => v.toFixed(v < 100 ? 2 : 1) + " km/s";
+  function fmtT(t) {
+    const s = Math.floor(t), hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
+    return "T+ " + [hh, mm, ss].map((n) => String(n).padStart(2, "0")).join(":");
+  }
+  let hudAcc = 0;
+  function updateHud(el) {
+    const fb = B[frameI];
+    $("r-frame").textContent = fb.name;
+    $("r-alt").textContent = fmtD(el.r - fb.r);
+    $("r-spd").textContent = fmtV(el.v);
+    $("r-ap").textContent = el.bound && el.ap < fb.soi ? fmtD(el.ap - fb.r) : frameI === 0 ? fmtD(el.ap - fb.r) : "leaves SOI";
+    $("r-pe").textContent = el.pe < fb.r ? "surface" : fmtD(el.pe - fb.r);
+    $("r-ecc").textContent = el.e.toFixed(3);
+    $("r-met").textContent = fmtT(simT);
+    $("fuel-bar").style.width = ship.fuel.toFixed(1) + "%";
+    $("r-fuel").textContent = Math.round(ship.fuel) + "%";
+    $("fuel").classList.toggle("low", ship.fuel < 20);
+    const w = $("c-warp"); w.textContent = "Warp " + WARPS[warpI] + "×"; w.className = "chip" + (warpI > 0 ? " warn" : "");
+    const hd = $("c-hold"); hd.textContent = hold === "off" ? "Hold off" : hold === "pro" ? "Hold prograde" : "Hold retrograde"; hd.className = "chip" + (hold !== "off" ? " on" : "");
+    $("b-pro").classList.toggle("active", hold === "pro"); $("b-ret").classList.toggle("active", hold === "retro");
+    const st = $("c-state");
+    if (ship.dead) { st.textContent = "Destroyed"; st.className = "chip bad"; }
+    else if (ship.landed >= 0) { st.textContent = ship.fuel < 100 ? "Landed · refuel" : "Landed"; st.className = "chip good"; }
+    else if (pred.event && pred.event.type === "impact") { st.textContent = "Impact course"; st.className = "chip bad"; }
+    else if (el.bound && el.pe > fb.r && el.ap < fb.soi) { st.textContent = "Stable orbit"; st.className = "chip on"; }
+    else if (pred.event && pred.event.type === "enc") { st.textContent = "Encounter"; st.className = "chip warn"; }
+    else { st.textContent = "Sub-orbital"; st.className = "chip"; }
+
+    const tb = B[targetI];
+    $("t-name").textContent = tb.name;
+    $("t-dist").textContent = fmtD(Math.hypot(BX[targetI] - ship.x, BY[targetI] - ship.y) - tb.r);
+    $("t-vel").textContent = fmtV(Math.hypot(BVX[targetI] - ship.vx, BVY[targetI] - ship.vy));
+
+    let c = 0;
+    for (const m of MISSIONS) { const d = !!done[m.id]; if (d) c++; $("m-" + m.id).classList.toggle("done", d); }
+    $("mis-count").textContent = c + "/" + MISSIONS.length;
+  }
+
+  // ---------- main loop ----------
+  let last = performance.now();
+  let curEl = null;
+  function loop(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    update(dt);
+
+    const prevFrame = frameI;
+    if (!ship.dead) frameI = ship.landed >= 0 ? ship.landed : frameOf(ship.x, ship.y);
+    if (frameI !== prevFrame && !ship.dead) toast("Entered " + B[frameI].name + (frameI === 0 ? " orbit" : "'s sphere of influence"));
+    const fb = B[frameI];
+    curEl = elements(ship.x - BX[frameI], ship.y - BY[frameI], ship.vx - BVX[frameI], ship.vy - BVY[frameI], fb.mu);
+    predict(curEl);
+
+    if (cam.map) { cam.x = 0; cam.y = 0; } else { cam.x = ship.x; cam.y = ship.y; }
+
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    drawStars(now);
+    drawBodyOrbits();
+    drawSun(now);
+    for (let i = 1; i < N; i++) drawPlanet(B[i]);
+    drawPrediction(curEl);
+    drawParticles(dt);
+    drawShip(now);
+    drawLabels();
+    drawTargetArrow();
+
+    hudAcc += dt;
+    if (hudAcc > 0.1) { hudAcc = 0; updateHud(curEl); checkMissions(curEl); }
+    requestAnimationFrame(loop);
+  }
+
+  addEventListener("resize", resize);
+  resize();
+  spawn();
+  computeBodies(simT, BX, BY, BVX, BVY);
+  toast("Hold W to burn prograde · watch the blue line");
+  requestAnimationFrame(loop);
+})();
+</script>
